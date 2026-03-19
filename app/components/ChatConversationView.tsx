@@ -8,6 +8,8 @@ import {
 import { useElisymClient } from "@elisym/sdk/react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { formatSol, truncateKey } from "@elisym/sdk";
+import { nip19 } from "nostr-tools";
+import { uploadToNostrBuild } from "~/lib/uploadImage";
 import type { ChatMessage } from "@elisym/sdk";
 import { useUI } from "~/contexts/UIContext";
 import { useIdentity } from "~/hooks/useIdentity";
@@ -26,7 +28,7 @@ export function ChatConversationView({
 }: ChatConversationViewProps) {
   const [state, dispatch] = useUI();
   const { client } = useElisymClient();
-  const { publicKey: myPubkey } = useIdentity();
+  const { publicKey: myPubkey, identity: myIdentity } = useIdentity();
   const { publicKey, connect, select, wallets } = useWallet();
   const { data: rawAgents } = useAgents();
   const displayAgents = useAgentDisplay(rawAgents);
@@ -42,11 +44,16 @@ export function ChatConversationView({
 
   const hire = useHireAgent();
 
-  // Sync stored messages into local state on load
+  // Sync stored messages into local state — merge, don't replace
   useEffect(() => {
-    if (loaded && storedMessages.length > 0) {
-      setLocalMessages(storedMessages);
-    }
+    if (!loaded || storedMessages.length === 0) return;
+    setLocalMessages((prev) => {
+      if (prev.length === 0) return storedMessages;
+      const existingIds = new Set(prev.map((m) => m.id));
+      const newOnes = storedMessages.filter((m) => !existingIds.has(m.id));
+      if (newOnes.length === 0) return prev;
+      return [...prev, ...newOnes];
+    });
   }, [loaded, storedMessages]);
 
   // Auto-scroll on new messages
@@ -59,10 +66,11 @@ export function ChatConversationView({
   const appendLocal = useCallback(
     (msgs: ChatMessage[]) => {
       setLocalMessages((prev) => {
-        const next = [...prev, ...msgs];
-        if (agent) {
-          persistChat(agentPubkey, agent.name, agent.picture, next, []);
-        }
+        const existingIds = new Set(prev.map((m) => m.id));
+        const deduped = msgs.filter((m) => !existingIds.has(m.id));
+        if (deduped.length === 0) return prev;
+        const next = [...prev, ...deduped];
+        persistChat(agentPubkey, agent?.name ?? "", agent?.picture, next, []);
         return next;
       });
     },
@@ -130,31 +138,41 @@ export function ChatConversationView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hire.step === "error"]);
 
-  async function handleSend(text: string, _file: File | null) {
-    if (!text) {
-      return;
+  async function handleSend(text: string, file: File | null) {
+    let msgText = text;
+
+    // Upload file if attached
+    if (file) {
+      try {
+        appendLocal([
+          { type: "system", id: crypto.randomUUID(), ts: Date.now(), text: `Uploading ${file.name}...`, loading: true },
+        ]);
+        const fileUrl = await uploadToNostrBuild(file, myIdentity);
+        msgText = msgText ? `${msgText}\n${fileUrl}` : fileUrl;
+        // Remove uploading indicator
+        setLocalMessages((prev) => prev.filter((m) => !m.loading));
+      } catch (_err) {
+        appendLocal([
+          { type: "error", id: crypto.randomUUID(), ts: Date.now(), text: "File upload failed" },
+        ]);
+        return;
+      }
     }
 
+    if (!msgText) return;
+
     appendLocal([
-      { type: "user", id: crypto.randomUUID(), ts: Date.now(), text },
+      { type: "user", id: crypto.randomUUID(), ts: Date.now(), text: msgText },
     ]);
 
     // If agent is online, submit job
     if (hire.step === "online" && agent) {
       const capability = agent.tags[0] || "general";
-      await hire.submitJob(text, capability, agent.agent);
+      await hire.submitJob(msgText, capability, agent.agent, myIdentity);
     } else {
       // Send as NIP-17 DM
       try {
-        const identity = client.chatDb; // just send via messaging
-        void client.messaging.sendMessage(
-          // Use a simple identity for DMs
-          (await import("@elisym/sdk")).ElisymIdentity.fromLocalStorage(
-            "elisym:identity",
-          )!,
-          agentPubkey,
-          text,
-        );
+        void client.messaging.sendMessage(myIdentity, agentPubkey, msgText);
       } catch (_err) {
         // Best effort
       }
@@ -188,7 +206,7 @@ export function ChatConversationView({
     await hire.pay(agent.agent);
   }
 
-  const agentName = agent?.name || truncateKey(agentPubkey);
+  const agentName = agent?.name || truncateKey(nip19.npubEncode(agentPubkey), 8);
   const agentPicture = agent?.picture;
 
   return (

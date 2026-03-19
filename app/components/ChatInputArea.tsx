@@ -9,6 +9,7 @@ export function ChatInputArea({ onSend }: ChatInputAreaProps) {
   const [text, setText] = useState("");
   const [state, dispatch] = useUI();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function handleSend() {
     const hasContent = text.trim() || state.selectedService || state.attachedFile;
@@ -23,14 +24,12 @@ export function ChatInputArea({ onSend }: ChatInputAreaProps) {
       dispatch({ type: "SET_SELECTED_SERVICE", service: null });
     }
 
-    if (state.attachedFile) {
-      const filePrefix = `[File: ${state.attachedFile.name}]`;
-      msgText = msgText ? `${filePrefix}\n${msgText}` : filePrefix;
-    }
-
     onSend(msgText, state.attachedFile);
     setText("");
     dispatch({ type: "SET_ATTACHED_FILE", file: null });
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -120,13 +119,21 @@ export function ChatInputArea({ onSend }: ChatInputAreaProps) {
             accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.csv,.json,.zip"
             onChange={handleFileChange}
           />
-          <input
-            className="chat-text-input flex-1 min-w-0 py-1.5 px-2 rounded-none border-none bg-transparent text-text text-[13.5px] outline-none"
+          <textarea
+            ref={textareaRef}
+            className="chat-text-input flex-1 min-w-0 py-1.5 px-2 rounded-none border-none bg-transparent text-text text-[13.5px] outline-none resize-none max-h-[120px]"
             placeholder="Write your message..."
+            rows={1}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              const el = e.target;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+            }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
                 handleSend();
               }
             }}

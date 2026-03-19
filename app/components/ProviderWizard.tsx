@@ -43,7 +43,8 @@ export function ProviderWizard() {
   const [state, dispatch] = useUI();
   const { client } = useElisymClient();
   const { publicKey } = useWallet();
-  const nostrPubkey = useOptionalIdentity()?.publicKey ?? "";
+  const idCtx = useOptionalIdentity();
+  const nostrPubkey = idCtx?.publicKey ?? "";
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [publishing, setPublishing] = useState(false);
   const [removedNames, setRemovedNames] = useState<string[]>([]);
@@ -180,9 +181,9 @@ export function ProviderWizard() {
 
     try {
       const identity =
+        idCtx?.identity ??
         ElisymIdentity.fromLocalStorage("elisym:identity") ??
         ElisymIdentity.generate();
-      identity.persist("elisym:identity");
 
       // Upload avatar if present, or use existing URL
       let avatarUrl: string | undefined;

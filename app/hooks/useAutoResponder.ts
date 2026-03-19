@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useElisymClient } from "@elisym/sdk/react";
 import { ElisymIdentity } from "@elisym/sdk";
+import { useOptionalIdentity } from "./useIdentity";
 import type { Event } from "nostr-tools";
 
 type SubCloser = { close: (reason?: string) => void };
@@ -35,6 +36,7 @@ export function loadProviderCards(): ProviderCard[] {
 
 export function useAutoResponder() {
   const { client } = useElisymClient();
+  const idCtx = useOptionalIdentity();
   const [online, setOnline] = useState(false);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const subsRef = useRef<SubCloser[]>([]);
@@ -52,9 +54,9 @@ export function useAutoResponder() {
     if (onlineRef.current) return;
 
     const identity =
+      idCtx?.identity ??
       ElisymIdentity.fromLocalStorage("elisym:identity") ??
       ElisymIdentity.generate();
-    identity.persist("elisym:identity");
 
     const cards = loadProviderCards();
     if (cards.length === 0) return;
@@ -95,7 +97,7 @@ export function useAutoResponder() {
     // Subscribe to DMs (NIP-17)
     const dmSub = client.messaging.subscribeToMessages(
       identity,
-      (senderPubkey: string, content: string) => {
+      (senderPubkey: string, content: string, _createdAt: number, _rumorId: string) => {
         // Handle ping → pong
         try {
           const msg = JSON.parse(content);
@@ -145,7 +147,7 @@ export function useAutoResponder() {
     subsRef.current.push(dmSub);
 
     setOnline(true);
-  }, [client, addActivity]);
+  }, [client, addActivity, idCtx?.identity]);
 
   const goOffline = useCallback(() => {
     for (const sub of subsRef.current) {
