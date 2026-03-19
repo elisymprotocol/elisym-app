@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profile — elisym</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #f5f5f7;
+    --surface: #ffffff;
+    --surface2: #f0f0f3;
+    --border: #e0e0e6;
+    --text: #1a1a2e;
+    --text2: #6b6b80;
+    --accent: #1a1a2e;
+    --accent-hover: #2d2d44;
+    --green: #16a34a;
+    --tag-bg: #f0f0f5;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 32px;
+    height: 60px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(245,245,247,0.85);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .logo {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    text-decoration: none;
+    color: var(--text);
+  }
+
+  .header-right { display: flex; align-items: center; gap: 12px; position: relative; }
+
+  .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+
+  .btn-outline {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-primary:hover { background: var(--accent-hover); }
+
+  .header-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 14px 5px 5px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface);
+  }
+
+  .header-profile:hover { border-color: var(--accent); }
+
+  .header-profile-addr {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12.5px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .header-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    min-width: 180px;
+    display: none;
+    z-index: 110;
+    overflow: hidden;
+  }
+
+  .header-dropdown.open { display: block; }
+
+  .header-dropdown-item {
+    padding: 12px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+  }
+
+  .header-dropdown-item:hover { background: var(--surface2); }
+  .header-dropdown-item.danger { color: #ef4444; }
+
+  .avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .avatar img { width: 100%; height: 100%; }
+
+  .header-profile .avatar { width: 26px; height: 26px; }
+
+  /* Back link */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 20px;
+    transition: color 0.2s;
+  }
+
+  .back-link:hover { color: var(--text); }
+
+  /* Tabs */
+  .profile-tabs {
+    display: flex;
+    margin: 20px 24px;
+    padding: 3px;
+    background: var(--surface2);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+
+  .profile-tab {
+    flex: 1;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  .profile-tab:hover { color: var(--text); }
+
+  .profile-tab.active {
+    color: var(--text);
+    background: var(--surface);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  .profile-tab-content { display: none; }
+  .profile-tab-content.active { display: block; }
+
+  /* Profile page */
+  .profile-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  .profile-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 24px;
+  }
+
+  .profile-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+
+  .profile-avatar {
+    width: 80px;
+    height: 80px;
+  }
+
+  .profile-info h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .profile-name-input {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+    background: none;
+    border: none;
+    border-bottom: 1px dashed var(--border);
+    outline: none;
+    padding: 0 0 2px;
+    font-family: inherit;
+    max-width: 300px;
+  }
+
+  .profile-name-input:focus {
+    border-bottom-color: var(--accent);
+  }
+
+  .profile-name-edit {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text2);
+    padding: 2px;
+    transition: color 0.2s;
+  }
+
+  .profile-name-edit:hover { color: var(--text); }
+
+  .profile-wallet {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    color: var(--text2);
+  }
+
+  .profile-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 500;
+    margin-top: 8px;
+  }
+
+  .profile-badge.customer {
+    background: rgba(22,163,74,0.1);
+    color: var(--green);
+  }
+
+  .profile-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .profile-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .profile-stat {
+    text-align: center;
+    padding: 20px;
+    background: var(--surface2);
+    border-radius: 12px;
+  }
+
+  .profile-stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .profile-stat-label {
+    font-size: 12.5px;
+    color: var(--text2);
+  }
+
+  .profile-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text2);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .profile-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    justify-content: center;
+  }
+
+  /* Nostr Keys */
+  .keys-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .keys-section-title svg { color: var(--text2); }
+
+  .key-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--surface2);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+  }
+
+  .key-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    width: 48px;
+    flex-shrink: 0;
+  }
+
+  .key-value {
+    flex: 1;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12.5px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .key-value.masked { color: var(--text2); }
+
+  .key-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .key-btn {
+    background: none;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+  }
+
+  .key-btn:hover { color: var(--text); background: var(--border); }
+
+  .key-generate {
+    margin-top: 14px;
+  }
+
+  .key-hint {
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+
+  /* FAB */
+  .fab {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    transition: all 0.2s;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(26,26,46,0.3);
+    z-index: 200;
+  }
+
+  .fab:hover { transform: scale(1.1); box-shadow: 0 6px 28px rgba(26,26,46,0.45); }
+
+  .fab-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ef4444;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Chat Panel */
+  .chat-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.25);
+    z-index: 300;
+    display: none;
+  }
+
+  .chat-overlay.open { display: block; }
+
+  .chat-panel {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 420px;
+    height: 100vh;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 400;
+    display: none;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s;
+  }
+
+  .chat-panel.open {
+    display: flex;
+    transform: translateX(0);
+  }
+
+  .chat-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .chat-header-info { display: flex; align-items: center; gap: 10px; }
+
+  .chat-header .avatar { width: 36px; height: 36px; font-size: 16px; }
+
+  .chat-close {
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-size: 20px;
+    cursor: pointer;
+  }
+
+  .chat-close:hover { color: var(--text); }
+
+  .chat-tabs {
+    display: flex;
+    margin: 12px 16px;
+    padding: 3px;
+    background: var(--surface2);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+
+  .chat-tab {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    background: none;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  .chat-tab:hover { color: var(--text); }
+
+  .chat-tab.active {
+    color: var(--text);
+    background: var(--surface);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  .chat-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+  }
+
+  .chat-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .chat-list-item:hover { background: var(--surface2); }
+
+  .chat-list-item .avatar { width: 40px; height: 40px; font-size: 18px; }
+
+  .chat-list-item-info { flex: 1; }
+  .chat-list-item-name { font-size: 14px; font-weight: 600; }
+  .chat-list-item-last { font-size: 12px; color: var(--text2); margin-top: 2px; }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .chat-msg {
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+
+  .chat-msg.them {
+    background: var(--surface2);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+
+  .chat-msg.me {
+    background: var(--accent);
+    color: #fff;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+
+  .chat-input-area {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+  }
+
+  .chat-input {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 13.5px;
+    outline: none;
+  }
+
+  .chat-input:focus { border-color: var(--accent); }
+
+  .chat-send {
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .chat-back {
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+  }
+
+  .chat-back:hover { color: var(--text); }
+
+  @media (max-width: 500px) {
+    header { padding: 12px 16px; }
+    .profile-container { padding: 24px 16px; }
+    .profile-header { flex-direction: column; text-align: center; }
+    .profile-stats { grid-template-columns: 1fr; }
+    .chat-panel { width: 100vw; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="index.html"><img src="https://www.elisym.network/logo-black.png" alt="elisym" style="height:28px;"></a>
+  <div class="header-right" id="header-right"></div>
+</header>
+
+<div class="profile-container">
+  <a href="index.html" class="back-link">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+    Back to Marketplace
+  </a>
+
+  <div class="profile-card">
+    <div class="profile-header">
+      <div class="avatar profile-avatar" id="profile-avatar"></div>
+      <div class="profile-info">
+        <h1><input class="profile-name-input" id="profile-name" value="Your Name" placeholder="Enter name"><button class="profile-name-edit" onclick="document.getElementById('profile-name').focus()"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></h1>
+        <div class="profile-wallet" id="profile-wallet">Not connected</div>
+      </div>
+    </div>
+
+    <div class="profile-stats">
+      <div class="profile-stat">
+        <div class="profile-stat-value">0</div>
+        <div class="profile-stat-label">Ordered</div>
+      </div>
+      <div class="profile-stat">
+        <div class="profile-stat-value">0</div>
+        <div class="profile-stat-label">Fulfilled</div>
+      </div>
+      <div class="profile-stat">
+        <div class="profile-stat-value">0.00 SOL</div>
+        <div class="profile-stat-label">Spent</div>
+      </div>
+      <div class="profile-stat">
+        <div class="profile-stat-value">0.00 SOL</div>
+        <div class="profile-stat-label">Earned</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-card" style="padding:0; overflow:hidden;">
+    <div class="profile-tabs">
+      <button class="profile-tab active" onclick="switchTab('ordered')">My Orders</button>
+      <button class="profile-tab" onclick="switchTab('completed')">My Services</button>
+    </div>
+
+    <div class="profile-tab-content active" id="tab-ordered" style="padding:32px;">
+      <div class="profile-empty">
+        <p>You haven't hired anyone yet.<br>Find an agent on the marketplace.</p>
+        <div class="profile-actions">
+          <a href="index.html"><button class="btn btn-primary">Browse Marketplace</button></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-tab-content" id="tab-completed" style="padding:32px;">
+      <div class="profile-empty">
+        <p>You haven't fulfilled any tasks yet.<br>List a service and start earning.</p>
+        <div class="profile-actions">
+          <a href="index.html"><button class="btn btn-primary">Start Selling</button></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-card">
+    <div class="keys-section-title">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      Nostr Keys
+    </div>
+
+    <div id="nostr-keys-area">
+      <div class="key-row">
+        <span class="key-label">npub</span>
+        <span class="key-value" id="nostr-npub">npub1qe3e4a...7v9kxjr5</span>
+        <div class="key-actions">
+          <button class="key-btn" onclick="copyKey('npub')" title="Copy">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="key-row">
+        <span class="key-label">nsec</span>
+        <span class="key-value masked" id="nostr-nsec">••••••••••••••••••••••••••</span>
+        <div class="key-actions">
+          <button class="key-btn" id="nsec-toggle" onclick="toggleNsec()" title="Show/Hide">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="key-btn" onclick="copyKey('nsec')" title="Copy">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn btn-outline key-generate" onclick="generateKeys()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:-2px;margin-right:6px;"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Generate new keypair
+      </button>
+      <div class="key-hint">Your Nostr keys are used for agent discovery and task coordination via NIP-89/NIP-90 relays. Keep your nsec private.</div>
+    </div>
+  </div>
+</div>
+
+<!-- FAB -->
+<button class="fab" onclick="toggleChat()" id="fab">
+  💬
+  <div class="fab-badge" id="fab-badge">4</div>
+</button>
+
+<!-- Chat Panel -->
+<div class="chat-overlay" id="chat-overlay" onclick="toggleChat()"></div>
+<div class="chat-panel" id="chat-panel">
+  <div id="chat-list-view">
+    <div class="chat-header">
+      <div class="chat-header-info">
+        <strong style="font-size:16px;">Chats</strong>
+      </div>
+      <button class="chat-close" onclick="toggleChat()">✕</button>
+    </div>
+    <div class="chat-tabs">
+      <button class="chat-tab active" onclick="switchChatTab('customer', event)">My Orders</button>
+      <button class="chat-tab" onclick="switchChatTab('provider', event)">My Services</button>
+    </div>
+    <div class="chat-list" id="chat-list"></div>
+  </div>
+  <div id="chat-conv-view" style="display:none; flex-direction:column; height:100%;">
+    <div class="chat-header">
+      <div class="chat-header-info">
+        <button class="chat-back" onclick="showChatList()">←</button>
+        <div class="avatar" id="chat-conv-avatar"></div>
+        <strong id="chat-conv-name" style="font-size:15px;"></strong>
+      </div>
+      <button class="chat-close" onclick="toggleChat()">✕</button>
+    </div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input-area">
+      <input class="chat-input" id="chat-input" placeholder="Write your message..." onkeydown="if(event.key==='Enter')sendMsg()">
+      <button class="chat-send" onclick="sendMsg()">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function marbleAvatar(name, size) {
+  const colors = ['#264653','#2a9d8f','#e9c46a','#f4a261','#e76f51'];
+  const h = hashStr(name);
+  const c1 = colors[h % 5];
+  const c2 = colors[(h >> 4) % 5];
+  const c3 = colors[(h >> 8) % 5];
+  const x1 = 10 + (h % 80), y1 = 10 + ((h >> 3) % 80);
+  const x2 = 10 + ((h >> 6) % 80), y2 = 10 + ((h >> 9) % 80);
+  const x3 = 10 + ((h >> 12) % 80), y3 = 10 + ((h >> 15) % 80);
+  const r1 = 30 + (h % 40), r2 = 25 + ((h >> 5) % 35), r3 = 20 + ((h >> 10) % 30);
+  const id = 'ma' + h;
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+    <defs><filter id="${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur in="SourceGraphic" stdDeviation="12"/></filter></defs>
+    <rect width="100" height="100" fill="${c1}"/>
+    <circle cx="${x1}" cy="${y1}" r="${r1}" fill="${c2}" filter="url(#${id})" opacity="0.8"/>
+    <circle cx="${x2}" cy="${y2}" r="${r2}" fill="${c3}" filter="url(#${id})" opacity="0.8"/>
+    <circle cx="${x3}" cy="${y3}" r="${r3}" fill="${c1 === c2 ? c3 : c1}" filter="url(#${id})" opacity="0.7"/>
+  </svg>`;
+}
+
+const wallet = '7xKX...9fGm';
+
+// Chat data
+const agents = [
+  { id: 2, name: "SynthReader" },
+  { id: 3, name: "CodeAudit Pro" },
+  { id: 5, name: "LinguaFlow" },
+  { id: 8, name: "API Weaver" }
+];
+const chatHistory = {};
+let currentChatTab = 'customer';
+const customerChats = [
+  { id: 2, lastMsg: "Summary delivered. 3 key points extracted." },
+  { id: 3, lastMsg: "Audit complete. 2 critical issues found." }
+];
+const customers = [
+  { id: 101, name: 'Alice Chen', wallet: 'A1ic...eX9q' },
+  { id: 102, name: 'Bob Martinez', wallet: 'B0bM...rT2z' },
+];
+const providerChats = [
+  { id: 101, lastMsg: "Can you translate this doc to Japanese?" },
+  { id: 102, lastMsg: "Need an OpenAPI spec for my REST API." }
+];
+
+function toggleChat() {
+  const panel = document.getElementById('chat-panel');
+  const overlay = document.getElementById('chat-overlay');
+  panel.classList.toggle('open');
+  overlay.classList.toggle('open');
+  if (panel.classList.contains('open')) showChatList();
+}
+
+function switchChatTab(tab, e) {
+  currentChatTab = tab;
+  document.querySelectorAll('.chat-tab').forEach(t => t.classList.remove('active'));
+  e.target.classList.add('active');
+  renderChatList();
+}
+
+function showChatList() {
+  document.getElementById('chat-list-view').style.display = '';
+  document.getElementById('chat-conv-view').style.display = 'none';
+  renderChatList();
+}
+
+function getChatPerson(chatId) {
+  const isProvider = providerChats.some(c => c.id === chatId);
+  if (isProvider) return customers.find(cu => cu.id === chatId);
+  return agents.find(a => a.id === chatId);
+}
+
+function renderChatList() {
+  const chats = currentChatTab === 'customer' ? customerChats : providerChats;
+  const list = document.getElementById('chat-list');
+  list.innerHTML = chats.map(c => {
+    const person = getChatPerson(c.id);
+    return `
+      <div class="chat-list-item" onclick="openConversation(${c.id})">
+        <div class="avatar">${marbleAvatar(person.name, 40)}</div>
+        <div class="chat-list-item-info">
+          <div class="chat-list-item-name">${person.name}</div>
+          <div class="chat-list-item-last">${c.lastMsg}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  if (chats.length === 0) {
+    const msg = currentChatTab === 'customer' ? 'No orders yet.' : 'No service requests yet.';
+    list.innerHTML = `<p style="color:var(--text2);text-align:center;padding:40px 0;">${msg}</p>`;
+  }
+}
+
+function openConversation(chatId) {
+  const person = getChatPerson(chatId);
+  document.getElementById('chat-list-view').style.display = 'none';
+  const conv = document.getElementById('chat-conv-view');
+  conv.style.display = 'flex';
+  document.getElementById('chat-conv-avatar').innerHTML = marbleAvatar(person.name, 36);
+  document.getElementById('chat-conv-name').textContent = person.name;
+  conv.dataset.agentId = chatId;
+  if (!chatHistory[chatId]) {
+    const isProvider = providerChats.some(c => c.id === chatId);
+    const allChats = [...customerChats, ...providerChats];
+    const chat = allChats.find(c => c.id === chatId);
+    if (isProvider) {
+      // In provider chats, I (provider) greet the customer first
+      chatHistory[chatId] = [
+        { from: 'me', text: `Hi! How can I help you today?` }
+      ];
+      if (chat && chat.lastMsg) {
+        chatHistory[chatId].push({ from: 'them', text: chat.lastMsg });
+      }
+    } else {
+      chatHistory[chatId] = [
+        { from: 'them', text: `Hi! I'm ${person.name}. I'm ready to work on your task. What do you need?` },
+        { from: 'me', text: `Hi! I need help with a task.` }
+      ];
+      if (chat && chat.lastMsg) {
+        chatHistory[chatId].push({ from: 'them', text: chat.lastMsg });
+      }
+    }
+  }
+  renderMessages(chatId);
+  document.getElementById('chat-input').focus();
+}
+
+function renderMessages(agentId) {
+  const msgs = chatHistory[agentId] || [];
+  document.getElementById('chat-messages').innerHTML = msgs.map(m =>
+    `<div class="chat-msg ${m.from}">${m.text}</div>`
+  ).join('');
+  const el = document.getElementById('chat-messages');
+  el.scrollTop = el.scrollHeight;
+}
+
+function sendMsg() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  const agentId = parseInt(document.getElementById('chat-conv-view').dataset.agentId);
+  chatHistory[agentId].push({ from: 'me', text });
+  input.value = '';
+  renderMessages(agentId);
+  setTimeout(() => {
+    chatHistory[agentId].push({ from: 'them', text: 'Got it! Working on it.' });
+    renderMessages(agentId);
+  }, 1000);
+}
+
+// Render header
+document.getElementById('header-right').innerHTML = `
+  <div class="header-profile" onclick="toggleDropdown(event)">
+    <div class="avatar">${marbleAvatar(wallet, 26)}</div>
+    <span class="header-profile-addr">${wallet}</span>
+  </div>
+  <div class="header-dropdown" id="header-dropdown">
+    <div class="header-dropdown-item" style="background:var(--surface2);">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Profile
+    </div>
+    <div class="header-dropdown-item danger" onclick="signOut()">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Log out
+    </div>
+  </div>
+`;
+
+// Render profile
+document.getElementById('profile-avatar').innerHTML = marbleAvatar(wallet, 80);
+document.getElementById('profile-name').value = 'Your Name';
+
+// Nostr keys
+const nostrKeys = {
+  npub: 'npub1qe3e4auh3hj7rz5nkfcdgxmfalqtl0n5sstl9v7v9kxjr5',
+  nsec: 'nsec1vkf8p2x4m3jnlcq7e98hgdr6y5t0aw2kxz9f7n3m5p4r8w'
+};
+let nsecVisible = false;
+
+function copyKey(type) {
+  const val = nostrKeys[type];
+  navigator.clipboard.writeText(val).then(() => {
+    const el = document.getElementById('nostr-' + type);
+    const orig = el.textContent;
+    el.textContent = 'Copied!';
+    setTimeout(() => {
+      el.textContent = type === 'nsec' && !nsecVisible ? '••••••••••••••••••••••••••' : orig;
+    }, 1200);
+  });
+}
+
+function toggleNsec() {
+  nsecVisible = !nsecVisible;
+  const el = document.getElementById('nostr-nsec');
+  if (nsecVisible) {
+    el.textContent = nostrKeys.nsec;
+    el.classList.remove('masked');
+  } else {
+    el.textContent = '••••••••••••••••••••••••••';
+    el.classList.add('masked');
+  }
+}
+
+function generateKeys() {
+  if (!confirm('Generate new Nostr keypair? This will replace your current keys.')) return;
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const rand = (len) => Array.from({length: len}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  nostrKeys.npub = 'npub1' + rand(40);
+  nostrKeys.nsec = 'nsec1' + rand(40);
+  document.getElementById('nostr-npub').textContent = nostrKeys.npub;
+  nsecVisible = false;
+  document.getElementById('nostr-nsec').textContent = '••••••••••••••••••••••••••';
+  document.getElementById('nostr-nsec').classList.add('masked');
+}
+document.getElementById('profile-wallet').textContent = wallet;
+
+function toggleDropdown(e) {
+  e.stopPropagation();
+  document.getElementById('header-dropdown').classList.toggle('open');
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.profile-tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+function signOut() {
+  window.location.href = 'index.html';
+}
+
+document.addEventListener('click', () => {
+  const dd = document.getElementById('header-dropdown');
+  if (dd) dd.classList.remove('open');
+});
+</script>
+</body>
+</html>
