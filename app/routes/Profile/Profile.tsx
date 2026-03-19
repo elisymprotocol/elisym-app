@@ -9,7 +9,8 @@ import { NostrKeys } from "~/components/NostrKeys";
 import { OrdersTable } from "~/components/OrdersTable";
 
 export default function Profile() {
-  const { npub } = useIdentity();
+  const { npub, publicKey: nostrPubkey, allIdentities, activeId } = useIdentity();
+  const activeKeyName = allIdentities.find((e) => e.id === activeId)?.name;
   const { publicKey } = useWallet();
   const wallet = publicKey?.toBase58() ?? "";
   const { jobs } = useJobHistory({ wallet });
@@ -30,7 +31,7 @@ export default function Profile() {
         Back to Marketplace
       </Link>
 
-      <ProfileCard npub={npub} />
+      <ProfileCard npub={npub} pubkey={nostrPubkey} keyName={activeKeyName} />
 
       <div className="bg-surface border border-border rounded-2xl p-8 mb-6">
         <ProfileStats jobs={jobs} />

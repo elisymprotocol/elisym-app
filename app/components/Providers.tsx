@@ -9,6 +9,7 @@ import { clusterApiUrl } from "@solana/web3.js";
 import { ElisymProvider } from "@elisym/sdk/react";
 import { usePendingJobSync } from "@elisym/sdk/react";
 import { UIProvider } from "~/contexts/UIContext";
+import { IdentityProvider } from "~/hooks/useIdentity";
 
 const queryClient = new QueryClient();
 
@@ -26,10 +27,12 @@ export function Providers({ children }: { children: ReactNode }) {
       <ConnectionProvider endpoint={endpoint}>
         <WalletProvider wallets={wallets} autoConnect>
           <ElisymProvider config={{ network: "devnet" }}>
-            <UIProvider>
-              <PendingJobSyncRunner />
-              {children}
-            </UIProvider>
+            <IdentityProvider>
+              <UIProvider>
+                <PendingJobSyncRunner />
+                {children}
+              </UIProvider>
+            </IdentityProvider>
           </ElisymProvider>
         </WalletProvider>
       </ConnectionProvider>
