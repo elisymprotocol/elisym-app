@@ -83,7 +83,12 @@ function uiReducer(state: UIState, action: UIAction): UIState {
     case "OPEN_WIZARD":
       return { ...state, wizardOpen: true, wizardStep: 1 };
     case "CLOSE_WIZARD":
-      return { ...state, wizardOpen: false };
+      return {
+        ...state,
+        wizardOpen: false,
+        wizardStep: 1,
+        wizardData: initialState.wizardData,
+      };
     case "SET_WIZARD_STEP":
       return { ...state, wizardStep: action.step };
     case "UPDATE_WIZARD_DATA":

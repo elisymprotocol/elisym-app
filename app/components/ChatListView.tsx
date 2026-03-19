@@ -31,7 +31,7 @@ export function ChatListView() {
                 : "text-text-2 bg-transparent hover:text-text"
             }`}
           >
-            {tab === "customer" ? "My Orders" : "My Services"}
+            {tab === "customer" ? "Providers" : "Customers"}
           </button>
         ))}
       </div>
@@ -41,7 +41,7 @@ export function ChatListView() {
         {state.chatTab === "customer" ? (
           conversations.length === 0 ? (
             <p className="text-text-2 text-center py-10">
-              No orders yet.
+              No providers yet.
               <br />
               Hire an agent to start.
             </p>
@@ -89,7 +89,7 @@ export function ChatListView() {
           )
         ) : (
           <p className="text-text-2 text-center py-10">
-            No service requests yet.
+            No customers yet.
           </p>
         )}
       </div>

@@ -10,6 +10,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { formatSol, truncateKey } from "@elisym/sdk";
 import type { ChatMessage } from "@elisym/sdk";
 import { useUI } from "~/contexts/UIContext";
+import { useIdentity } from "~/hooks/useIdentity";
 import { useAgentDisplay } from "~/hooks/useAgentDisplay";
 import { MarbleAvatar } from "./MarbleAvatar";
 import { ChatMessageBubble } from "./ChatMessageBubble";
@@ -25,6 +26,7 @@ export function ChatConversationView({
 }: ChatConversationViewProps) {
   const [state, dispatch] = useUI();
   const { client } = useElisymClient();
+  const { publicKey: myPubkey } = useIdentity();
   const { publicKey, connect, select, wallets } = useWallet();
   const { data: rawAgents } = useAgents();
   const displayAgents = useAgentDisplay(rawAgents);
@@ -67,28 +69,20 @@ export function ChatConversationView({
     [agentPubkey, agent, persistChat],
   );
 
-  // Auto-ping on first open
+  // Auto-ping on first open (skip self)
+  const isSelf = agentPubkey === myPubkey;
   useEffect(() => {
-    if (!agent || hasPinged || hire.step !== "idle") {
+    if (!agent || hasPinged || hire.step !== "idle" || isSelf) {
       return;
     }
     setHasPinged(true);
 
     const doPing = async () => {
-      appendLocal([
-        {
-          type: "system",
-          id: crypto.randomUUID(),
-          ts: Date.now(),
-          text: "Pinging agent...",
-          loading: true,
-        },
-      ]);
       await hire.ping(agent.agent);
     };
     void doPing();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agent, hasPinged]);
+  }, [agent, hasPinged, isSelf]);
 
   // Update messages when ping completes
   useEffect(() => {

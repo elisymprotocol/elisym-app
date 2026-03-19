@@ -239,3 +239,8 @@ export function useIdentity(): IdentityContextValue {
   }
   return ctx;
 }
+
+/** Returns null during SSR / before IdentityProvider hydrates. */
+export function useOptionalIdentity(): IdentityContextValue | null {
+  return useContext(IdentityContext);
+}

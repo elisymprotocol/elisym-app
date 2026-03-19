@@ -1,9 +1,18 @@
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useElisymClient } from "@elisym/sdk/react";
-import { ElisymIdentity } from "@elisym/sdk";
+import { ElisymIdentity, type CapabilityCard } from "@elisym/sdk";
 import { useUI } from "~/contexts/UIContext";
+import { useOptionalIdentity } from "~/hooks/useIdentity";
+import { useLocalQuery } from "~/hooks/useLocalQuery";
 import { uploadToNostrBuild } from "~/lib/uploadImage";
+import type { Filter } from "nostr-tools";
+
+interface NostrProfile {
+  name?: string;
+  about?: string;
+  picture?: string;
+}
 
 interface WizProduct {
   name: string;
@@ -12,6 +21,8 @@ interface WizProduct {
   tags: string[];
   photoFile: File | null;
   photoPreview: string | null;
+  /** Original name from Nostr — used to detect renames and deletions. */
+  originalName?: string;
 }
 
 function getWizData(data: Record<string, unknown>) {
@@ -32,11 +43,129 @@ export function ProviderWizard() {
   const [state, dispatch] = useUI();
   const { client } = useElisymClient();
   const { publicKey } = useWallet();
+  const nostrPubkey = useOptionalIdentity()?.publicKey ?? "";
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [publishing, setPublishing] = useState(false);
+  const [removedNames, setRemovedNames] = useState<string[]>([]);
+  const populatedForPubkey = useRef<string | null>(null);
 
   const wiz = getWizData(state.wizardData);
   const step = state.wizardStep;
+
+  // Fetch existing Nostr profile (reuses cache from ProfileCard)
+  const { data: profile } = useLocalQuery<NostrProfile | null>({
+    queryKey: ["nostr-profile", nostrPubkey],
+    queryFn: async () => {
+      const events = await client.pool.querySync({
+        kinds: [0],
+        authors: [nostrPubkey],
+      } as Filter);
+      const sorted = events.sort((a, b) => b.created_at - a.created_at);
+      const latest = sorted[0];
+      if (latest) {
+        try {
+          return JSON.parse(latest.content);
+        } catch {
+          // malformed
+        }
+      }
+      return null;
+    },
+    enabled: !!nostrPubkey,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Fetch existing capabilities (kind:31990)
+  const { data: existingCards } = useLocalQuery<CapabilityCard[]>({
+    queryKey: ["nostr-capabilities", nostrPubkey],
+    queryFn: async () => {
+      const events = await client.pool.querySync({
+        kinds: [31990],
+        authors: [nostrPubkey],
+        "#t": ["elisym"],
+      } as Filter);
+      const byName = new Map<string, { card: CapabilityCard; ts: number }>();
+      for (const ev of events) {
+        try {
+          const parsed = JSON.parse(ev.content) as CapabilityCard & { deleted?: boolean };
+          // Skip tombstoned (deleted) capabilities
+          if (!parsed.name || parsed.deleted) continue;
+          const existing = byName.get(parsed.name);
+          if (!existing || ev.created_at > existing.ts) {
+            byName.set(parsed.name, { card: parsed, ts: ev.created_at });
+          }
+        } catch {
+          // malformed
+        }
+      }
+      return Array.from(byName.values()).map((e) => e.card);
+    },
+    enabled: !!nostrPubkey,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Reset populated ref when wizard closes so next open re-fetches from Nostr
+  useEffect(() => {
+    if (!state.wizardOpen) {
+      populatedForPubkey.current = null;
+      setRemovedNames([]);
+    }
+  }, [state.wizardOpen]);
+
+  // Pre-populate wizard fields from existing profile & capabilities
+  // Wait for both queries to resolve (undefined = loading, null/[] = resolved with no data)
+  useEffect(() => {
+    if (!state.wizardOpen || profile === undefined || existingCards === undefined) return;
+    const identityChanged = populatedForPubkey.current !== nostrPubkey;
+    const patch: Record<string, unknown> = {};
+
+    if (identityChanged) {
+      // Reset fields first so stale data from previous identity doesn't linger
+      patch.name = "";
+      patch.desc = "";
+      patch.avatarPreview = null;
+      patch.avatarFile = null;
+      patch.products = [{ name: "", desc: "", price: "", tags: [], photoFile: null, photoPreview: null }];
+      setRemovedNames([]);
+    }
+
+    if (profile) {
+      if ((identityChanged || !wiz.name) && profile.name) patch.name = profile.name;
+      if ((identityChanged || !wiz.desc) && profile.about) patch.desc = profile.about;
+      if ((identityChanged || !wiz.avatarPreview) && profile.picture) {
+        patch.avatarPreview = profile.picture;
+        patch.avatarFile = null;
+      }
+    }
+
+    if (existingCards && existingCards.length > 0) {
+      const hasProducts = wiz.products.some((p) => p.name);
+      if (identityChanged || !hasProducts) {
+        patch.products = existingCards.map((card) => {
+          const price = card.payment?.job_price
+            ? (card.payment.job_price / 1_000_000_000).toString()
+            : "";
+          const tags = CATEGORIES.filter((cat) =>
+            card.capabilities.includes(cat.toLowerCase().replace(/[^a-z0-9-]/g, "-")),
+          );
+          return {
+            name: card.name,
+            desc: card.description,
+            price,
+            tags,
+            photoFile: null,
+            photoPreview: card.image ?? null,
+            originalName: card.name,
+          } satisfies WizProduct;
+        });
+      }
+    }
+
+    if (Object.keys(patch).length > 0) {
+      dispatch({ type: "UPDATE_WIZARD_DATA", data: patch });
+    }
+    populatedForPubkey.current = nostrPubkey;
+  }, [state.wizardOpen, profile, existingCards, nostrPubkey]);
 
   const updateData = useCallback(
     (patch: Record<string, unknown>) => {
@@ -55,19 +184,41 @@ export function ProviderWizard() {
         ElisymIdentity.generate();
       identity.persist("elisym:identity");
 
-      // Upload avatar if present
+      // Upload avatar if present, or use existing URL
       let avatarUrl: string | undefined;
       if (wiz.avatarFile) {
         avatarUrl = await uploadToNostrBuild(wiz.avatarFile, identity);
+      } else if (wiz.avatarPreview && !wiz.avatarPreview.startsWith("data:")) {
+        avatarUrl = wiz.avatarPreview;
       }
 
-      // Publish profile (kind:0)
-      await client.discovery.publishProfile(
-        identity,
-        wiz.name,
-        wiz.desc,
-        avatarUrl,
-      );
+      // Publish profile (kind:0) only if data changed
+      const profileChanged =
+        wiz.name !== (profile?.name ?? "") ||
+        wiz.desc !== (profile?.about ?? "") ||
+        avatarUrl !== (profile?.picture ?? undefined);
+
+      if (profileChanged) {
+        await client.discovery.publishProfile(
+          identity,
+          wiz.name,
+          wiz.desc,
+          avatarUrl,
+        );
+      }
+
+      // Delete removed capabilities from Nostr (NIP-09)
+      const namesToDelete = new Set(removedNames);
+      // Also delete old names for renamed products
+      for (const product of wiz.products) {
+        if (product.originalName && product.name && product.originalName !== product.name) {
+          namesToDelete.add(product.originalName);
+        }
+      }
+      for (const name of namesToDelete) {
+        await client.discovery.deleteCapability(identity, name);
+      }
+      setRemovedNames([]);
 
       // Get wallet address for payment info
       const walletAddress = publicKey?.toBase58();
@@ -79,6 +230,8 @@ export function ProviderWizard() {
         let imageUrl: string | undefined;
         if (product.photoFile) {
           imageUrl = await uploadToNostrBuild(product.photoFile, identity);
+        } else if (product.photoPreview && !product.photoPreview.startsWith("data:")) {
+          imageUrl = product.photoPreview;
         }
 
         const capabilities = product.tags.length > 0
@@ -109,6 +262,27 @@ export function ProviderWizard() {
         await client.discovery.publishCapability(identity, card);
       }
 
+      // Save cards to localStorage for provider mode
+      const publishedProducts = wiz.products.filter((p) => p.name);
+      if (publishedProducts.length > 0) {
+        localStorage.setItem(
+          "elisym:provider-cards",
+          JSON.stringify(
+            publishedProducts.map((p) => ({
+              name: p.name,
+              description: p.desc,
+              price: p.price,
+              capabilities:
+                p.tags.length > 0
+                  ? p.tags.map((t) =>
+                      t.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
+                    )
+                  : ["general"],
+            })),
+          ),
+        );
+      }
+
       dispatch({ type: "SET_WIZARD_STEP", step: 3 });
     } catch (err) {
       alert(
@@ -130,6 +304,11 @@ export function ProviderWizard() {
 
   function handleBack() {
     if (step > 1) {
+      // Reset products to Nostr state so uncommitted removals/edits are discarded
+      if (step === 2) {
+        populatedForPubkey.current = null;
+        setRemovedNames([]);
+      }
       dispatch({ type: "SET_WIZARD_STEP", step: step - 1 });
     }
   }
@@ -195,7 +374,7 @@ export function ProviderWizard() {
             onAvatarUpload={handleAvatarUpload}
           />
         )}
-        {step === 2 && <Step2 wiz={wiz} updateData={updateData} />}
+        {step === 2 && <Step2 wiz={wiz} updateData={updateData} onTrackRemoval={(name) => setRemovedNames((prev) => [...prev, name])} />}
         {step === 3 && (
           <StepSuccess onClose={() => dispatch({ type: "CLOSE_WIZARD" })} />
         )}
@@ -316,9 +495,11 @@ function Step1({
 function Step2({
   wiz,
   updateData,
+  onTrackRemoval,
 }: {
   wiz: WizData;
   updateData: (patch: Record<string, unknown>) => void;
+  onTrackRemoval: (name: string) => void;
 }) {
   function updateProduct(index: number, patch: Partial<WizProduct>) {
     const next = [...wiz.products];
@@ -329,6 +510,10 @@ function Step2({
   }
 
   function removeProduct(index: number) {
+    const product = wiz.products[index];
+    if (product?.originalName) {
+      onTrackRemoval(product.originalName);
+    }
     const next = wiz.products.filter((_, j) => j !== index);
     updateData({ products: next });
   }
