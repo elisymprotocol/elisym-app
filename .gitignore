@@ -1,1 +1,14 @@
 .claude
+node_modules
+dist
+build
+.react-router
+logs
+*.log
+npm-debug.log*
+.vscode
+.idea
+.DS_Store
+.env
+.env.local
+temp/
