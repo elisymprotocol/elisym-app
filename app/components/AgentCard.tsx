@@ -1,5 +1,7 @@
 import { useCallback } from "react";
 import { useElisymClient } from "@elisym/sdk/react";
+import { truncateKey } from "@elisym/sdk";
+import { nip19 } from "nostr-tools";
 import { MarbleAvatar } from "./MarbleAvatar";
 import { useUI } from "~/contexts/UIContext";
 import type { AgentDisplayData } from "~/hooks/useAgentDisplay";
@@ -45,10 +47,12 @@ export function AgentCard({ agent }: AgentCardProps) {
               }}
             />
           ) : (
-            <MarbleAvatar name={agent.name} size={48} />
+            <MarbleAvatar name={agent.pubkey} size={48} />
           )}
         </div>
-        <div className="text-base font-semibold">{agent.name}</div>
+        <div className="text-base font-semibold">
+          {agent.name || truncateKey(nip19.npubEncode(agent.pubkey), 8)}
+        </div>
       </div>
 
       <div className="text-text-2 text-sm leading-relaxed">

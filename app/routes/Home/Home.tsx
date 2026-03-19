@@ -3,7 +3,7 @@ import { useAgentDisplay } from "~/hooks/useAgentDisplay";
 import { useUI } from "~/contexts/UIContext";
 import { HeroSection } from "~/components/HeroSection";
 import { StatsBar } from "~/components/StatsBar";
-import { FilterBar } from "~/components/FilterBar";
+import { FilterBar, KNOWN_CATEGORIES } from "~/components/FilterBar";
 import { AgentCard } from "~/components/AgentCard";
 
 export default function Home() {
@@ -14,11 +14,15 @@ export default function Home() {
   const filtered =
     state.currentFilter === "all"
       ? displayAgents
-      : displayAgents.filter((a) =>
-          a.tags.some((t) =>
-            t.toLowerCase().includes(state.currentFilter.toLowerCase()),
-          ),
-        );
+      : state.currentFilter === "other"
+        ? displayAgents.filter((a) =>
+            a.tags.some((t) => !KNOWN_CATEGORIES.includes(t.toLowerCase())),
+          )
+        : displayAgents.filter((a) =>
+            a.tags.some((t) =>
+              t.toLowerCase().includes(state.currentFilter.toLowerCase()),
+            ),
+          );
 
   return (
     <>

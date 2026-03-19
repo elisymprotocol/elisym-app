@@ -126,7 +126,7 @@ export function ProfileCard({ npub, pubkey, keyName }: ProfileCardProps) {
               className="w-full h-full object-cover"
             />
           ) : (
-            <MarbleAvatar name={npub} size={80} />
+            <MarbleAvatar name={pubkey} size={80} />
           )}
         </div>
         <div className="flex-1 min-w-0">

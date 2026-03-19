@@ -1,10 +1,14 @@
 import { useUI } from "~/contexts/UIContext";
 
+export const KNOWN_CATEGORIES = ["ui-ux", "summary", "tools", "code", "data"];
+
 const FILTERS = [
   { key: "all", label: "All" },
   { key: "ui-ux", label: "UI/UX" },
   { key: "summary", label: "Summary" },
   { key: "tools", label: "Tools" },
+  { key: "code", label: "Code" },
+  { key: "data", label: "Data" },
   { key: "other", label: "Other" },
 ];
 

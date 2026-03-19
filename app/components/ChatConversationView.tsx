@@ -48,11 +48,11 @@ export function ChatConversationView({
   useEffect(() => {
     if (!loaded || storedMessages.length === 0) return;
     setLocalMessages((prev) => {
-      if (prev.length === 0) return storedMessages;
+      if (prev.length === 0) return [...storedMessages].sort((a, b) => a.ts - b.ts);
       const existingIds = new Set(prev.map((m) => m.id));
       const newOnes = storedMessages.filter((m) => !existingIds.has(m.id));
       if (newOnes.length === 0) return prev;
-      return [...prev, ...newOnes];
+      return [...prev, ...newOnes].sort((a, b) => a.ts - b.ts);
     });
   }, [loaded, storedMessages]);
 
@@ -69,7 +69,7 @@ export function ChatConversationView({
         const existingIds = new Set(prev.map((m) => m.id));
         const deduped = msgs.filter((m) => !existingIds.has(m.id));
         if (deduped.length === 0) return prev;
-        const next = [...prev, ...deduped];
+        const next = [...prev, ...deduped].sort((a, b) => a.ts - b.ts);
         persistChat(agentPubkey, agent?.name ?? "", agent?.picture, next, []);
         return next;
       });
@@ -230,7 +230,7 @@ export function ChatConversationView({
                 className="w-full h-full object-cover rounded-full"
               />
             ) : (
-              <MarbleAvatar name={agentName} size={36} />
+              <MarbleAvatar name={agentPubkey} size={36} />
             )}
           </div>
           <strong className="text-[15px]">{agentName}</strong>

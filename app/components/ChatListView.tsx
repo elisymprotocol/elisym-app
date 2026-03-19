@@ -1,7 +1,8 @@
-import { useAllConversations } from "@elisym/sdk/react";
+import { useAllConversations, useAgents } from "@elisym/sdk/react";
 import { truncateKey } from "@elisym/sdk";
 import { nip19 } from "nostr-tools";
 import { useUI } from "~/contexts/UIContext";
+import { useAgentDisplay } from "~/hooks/useAgentDisplay";
 import { MarbleAvatar } from "./MarbleAvatar";
 
 function formatDate(ts: number): string {
@@ -22,6 +23,8 @@ function formatDate(ts: number): string {
 
 export function ChatListView() {
   const { conversations } = useAllConversations();
+  const { data: rawAgents } = useAgents();
+  const displayAgents = useAgentDisplay(rawAgents);
   const [state, dispatch] = useUI();
 
   return (
@@ -45,8 +48,10 @@ export function ChatListView() {
           </p>
         ) : (
           conversations.map((c) => {
+            const knownAgent = displayAgents.find((a) => a.pubkey === c.agentPubkey);
             const npub = nip19.npubEncode(c.agentPubkey);
-            const displayName = c.agentName || truncateKey(npub, 8);
+            const displayName = knownAgent?.name || c.agentName || truncateKey(npub, 8);
+            const picture = knownAgent?.picture || c.agentPicture;
             const lastMsg =
               c.messages.length > 0
                 ? c.messages[c.messages.length - 1]
@@ -68,9 +73,9 @@ export function ChatListView() {
                 className="flex items-center gap-3 p-3 rounded-[10px] cursor-pointer transition-colors hover:bg-surface-2"
               >
                 <div className="w-10 h-10 rounded-full shrink-0 overflow-hidden">
-                  {c.agentPicture ? (
+                  {picture ? (
                     <img
-                      src={c.agentPicture}
+                      src={picture}
                       alt={displayName}
                       className="w-full h-full object-cover"
                     />

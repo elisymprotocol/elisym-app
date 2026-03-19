@@ -37,7 +37,7 @@ function getWizData(data: Record<string, unknown>) {
   };
 }
 
-const CATEGORIES = ["UI/UX", "Summary", "Tools", "Code", "Data", "Other"];
+const CATEGORIES = ["UI/UX", "Summary", "Tools", "Code", "Data"];
 
 export function ProviderWizard() {
   const [state, dispatch] = useUI();
@@ -541,12 +541,11 @@ function Step2({
     reader.readAsDataURL(file);
   }
 
-  function toggleTag(index: number, tag: string) {
+  function selectTag(index: number, tag: string) {
     const product = wiz.products[index];
     if (!product) return;
-    const tags = product.tags.includes(tag)
-      ? product.tags.filter((t) => t !== tag)
-      : [...product.tags, tag];
+    // Single select — same tag deselects
+    const tags = product.tags[0] === tag ? [] : [tag];
     updateProduct(index, { tags });
   }
 
@@ -564,7 +563,7 @@ function Step2({
           onUpdate={updateProduct}
           onRemove={removeProduct}
           onPhotoChange={handleProductPhoto}
-          onToggleTag={toggleTag}
+          onSelectTag={selectTag}
         />
       ))}
 
@@ -585,7 +584,7 @@ function ProductCard({
   onUpdate,
   onRemove,
   onPhotoChange,
-  onToggleTag,
+  onSelectTag,
 }: {
   product: WizProduct;
   index: number;
@@ -593,7 +592,7 @@ function ProductCard({
   onUpdate: (index: number, patch: Partial<WizProduct>) => void;
   onRemove: (index: number) => void;
   onPhotoChange: (index: number, e: React.ChangeEvent<HTMLInputElement>) => void;
-  onToggleTag: (index: number, tag: string) => void;
+  onSelectTag: (index: number, tag: string) => void;
 }) {
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -675,15 +674,15 @@ function ProductCard({
 
       <div>
         <label className="block text-[13px] font-medium text-text-2 mb-2">
-          Tags
+          Tag
         </label>
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap items-center">
           {CATEGORIES.map((tag) => (
             <button
               key={tag}
-              onClick={() => onToggleTag(index, tag)}
+              onClick={() => onSelectTag(index, tag)}
               className={`py-1.5 px-3 rounded-[20px] border text-xs font-medium cursor-pointer transition-all ${
-                product.tags.includes(tag)
+                product.tags[0] === tag
                   ? "bg-accent border-accent text-white"
                   : "bg-transparent border-border text-text-2 hover:border-accent hover:text-text"
               }`}
@@ -691,6 +690,24 @@ function ProductCard({
               {tag}
             </button>
           ))}
+          <input
+            className={`py-1.5 px-3 rounded-[20px] border text-xs font-medium outline-none w-24 transition-all ${
+              product.tags.length > 0 && !CATEGORIES.includes(product.tags[0]!)
+                ? "bg-accent border-accent text-white placeholder:text-white/50"
+                : "bg-transparent border-border text-text-2 placeholder:text-text-2/50 focus:border-accent"
+            }`}
+            placeholder="Custom..."
+            value={product.tags.length > 0 && !CATEGORIES.includes(product.tags[0]!) ? product.tags[0] : ""}
+            onChange={(e) => {
+              const val = e.target.value;
+              onUpdate(index, { tags: val ? [val] : [] });
+            }}
+            onFocus={() => {
+              if (product.tags.length > 0 && CATEGORIES.includes(product.tags[0]!)) {
+                onUpdate(index, { tags: [] });
+              }
+            }}
+          />
         </div>
       </div>
     </div>

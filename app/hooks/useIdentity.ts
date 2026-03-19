@@ -137,7 +137,7 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
   }, []);
 
   if (!state) {
-    return createElement("div", null, children);
+    return createElement(IdentityContext.Provider, { value: null }, children);
   }
 
   const { identity, allIdentities, activeId } = state;

@@ -129,7 +129,7 @@ export function ChatMessageBubble({ message, onPay }: ChatMessageBubbleProps) {
       return (
         <div className="max-w-[80%] self-start">
           <div
-            className={`py-2.5 px-3.5 rounded-xl bg-surface-2 rounded-bl-sm text-[13.5px] leading-relaxed ${
+            className={`py-2.5 px-3.5 rounded-xl bg-surface-2 rounded-bl-sm text-[13.5px] leading-relaxed whitespace-pre-wrap ${
               message.loading ? "italic opacity-70" : ""
             }`}
           >

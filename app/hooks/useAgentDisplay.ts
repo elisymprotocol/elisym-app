@@ -23,8 +23,8 @@ function toDisplayData(agent: Agent): AgentDisplayData {
   const cards = agent.cards;
   const firstCard = cards[0];
 
-  // Use agent-level name/about from kind:0, fallback to first card
-  const name = agent.name || firstCard?.name || "Unknown";
+  // Use agent-level name/about from kind:0, fallback to truncated npub
+  const name = agent.name || "";
   const description = agent.about || firstCard?.description || "";
 
   // Collect all tags from all cards
