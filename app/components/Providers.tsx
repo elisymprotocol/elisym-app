@@ -9,9 +9,10 @@ import {
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
 import { ElisymProvider, useElisymClient } from "@elisym/sdk/react";
-import { usePendingJobSync } from "@elisym/sdk/react";
+import { usePendingJobSync, useHistorySync } from "@elisym/sdk/react";
 import { toast } from "sonner";
 import { truncateKey } from "@elisym/sdk";
+import { resolveJobToast, hasJobToast } from "~/lib/jobToasts";
 import { UIProvider, useUI } from "~/contexts/UIContext";
 import { IdentityProvider, useOptionalIdentity } from "~/hooks/useIdentity";
 
@@ -35,9 +36,13 @@ function PendingJobSyncRunner() {
           const prevCount = prevCountsRef.current.get(convo.agentPubkey) ?? 0;
 
           if (resultCount > prevCount && prevCount > 0) {
-            // New result arrived — toast if not viewing that conversation
-            if (uiRef.current.activeConversation !== convo.agentPubkey) {
-              const name = convo.agentName || truncateKey(nip19.npubEncode(convo.agentPubkey), 8);
+            const name = convo.agentName || truncateKey(nip19.npubEncode(convo.agentPubkey), 8);
+
+            // Resolve the global loading toast if one exists for this agent
+            if (hasJobToast(convo.agentPubkey)) {
+              resolveJobToast(convo.agentPubkey, `${name}: result received`);
+            } else if (uiRef.current.activeConversation !== convo.agentPubkey) {
+              // No active loading toast — show a new success toast (unless viewing that chat)
               toast.success(`${name}: result received`);
             }
           }
@@ -58,12 +63,13 @@ function IdentitySync() {
   const identity = idCtx?.identity;
   const [uiState] = useUI();
 
-  // Switch chatDb to active identity
-  useEffect(() => {
-    if (pubkey) {
-      client.chatDb.setOwner(pubkey);
-    }
-  }, [client, pubkey]);
+  // Switch chatDb to active identity synchronously — before any hooks read from it
+  if (pubkey && client.chatDb.currentOwner !== pubkey) {
+    client.chatDb.setOwner(pubkey);
+  }
+
+  // Sync chat history from relays (initial + catch-up)
+  useHistorySync(identity);
 
   // Keep UI state in ref so subscription callback sees latest value
   const uiRef = useRef(uiState);

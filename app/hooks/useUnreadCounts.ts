@@ -4,6 +4,17 @@ import { useOptionalIdentity } from "./useIdentity";
 
 const STORAGE_KEY_PREFIX = "elisym-lastRead";
 
+/** Skip protocol messages (ping/pong) from unread counts */
+function isProtocolMessage(text: string): boolean {
+  if (!text.startsWith("{")) return false;
+  try {
+    const msg = JSON.parse(text);
+    return msg.type === "elisym_ping" || msg.type === "elisym_pong";
+  } catch {
+    return false;
+  }
+}
+
 function storageKey(ownerPubkey: string): string {
   return `${STORAGE_KEY_PREFIX}-${ownerPubkey}`;
 }
@@ -52,7 +63,7 @@ export function useUnreadCounts() {
     for (const convo of conversations) {
       const readTs = lastRead[convo.agentPubkey] ?? 0;
       const count = convo.messages.filter(
-        (m) => incomingTypes.has(m.type) && m.ts > readTs,
+        (m) => incomingTypes.has(m.type) && m.ts > readTs && !("text" in m && isProtocolMessage(m.text)),
       ).length;
       if (count > 0) map[convo.agentPubkey] = count;
     }

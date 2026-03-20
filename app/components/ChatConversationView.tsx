@@ -4,6 +4,7 @@ import {
   usePersistChat,
   useHireAgent,
   useAgents,
+  useAllConversations,
 } from "@elisym/sdk/react";
 import { useElisymClient } from "@elisym/sdk/react";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -11,6 +12,7 @@ import { formatSol, truncateKey } from "@elisym/sdk";
 import { nip19 } from "nostr-tools";
 import { toast } from "sonner";
 import { uploadToNostrBuild } from "~/lib/uploadImage";
+import { setJobToast, resolveJobToast, failJobToast, dismissJobToast } from "~/lib/jobToasts";
 import type { ChatMessage, Agent } from "@elisym/sdk";
 import type { Filter } from "nostr-tools";
 import { useUI } from "~/contexts/UIContext";
@@ -37,6 +39,8 @@ export function ChatConversationView({
   const { data: rawAgents } = useAgents();
   const displayAgents = useAgentDisplay(rawAgents);
   const agent = displayAgents.find((a) => a.pubkey === agentPubkey);
+  const { conversations } = useAllConversations();
+  const convo = conversations.find((c) => c.agentPubkey === agentPubkey);
 
   // Fetch kind:0 Nostr profile for the chat peer
   const { data: nostrProfile } = useLocalQuery<{ name?: string; picture?: string; about?: string } | null>({
@@ -59,6 +63,25 @@ export function ChatConversationView({
   const { messages: storedMessages, pendingJobIds, loaded } = useChatHistory(agentPubkey);
   const persistChat = usePersistChat();
 
+  // Persist resolved profile to IndexedDB so it's available immediately next time
+  useEffect(() => {
+    const name = nostrProfile?.name || agent?.name;
+    const picture = nostrProfile?.picture || agent?.picture;
+    if (!name && !picture) return;
+    const convoData = conversations.find((c) => c.agentPubkey === agentPubkey);
+    if (!convoData) return;
+    const needsUpdate =
+      (name && name !== convoData.agentName) ||
+      (picture && picture !== convoData.agentPicture);
+    if (needsUpdate) {
+      void client.chatDb.saveConversation({
+        ...convoData,
+        agentName: name || convoData.agentName,
+        agentPicture: picture || convoData.agentPicture,
+      });
+    }
+  }, [nostrProfile, agent, agentPubkey]);
+
   // Local messages state — starts from stored, appended locally
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
   const localMessagesRef = useRef<ChatMessage[]>([]);
@@ -76,7 +99,7 @@ export function ChatConversationView({
   const hire = useHireAgent({
     onJobCreated(jobId) {
       pendingJobIdsRef.current = [...pendingJobIdsRef.current, jobId];
-      persistChat(agentPubkey, agent?.name ?? "", agent?.picture, localMessagesRef.current, pendingJobIdsRef.current);
+      persistChat(agentPubkey, agentNameRef.current, agentPictureRef.current, localMessagesRef.current, pendingJobIdsRef.current);
     },
   });
   const { markRead } = useUnreadCounts();
@@ -128,11 +151,11 @@ export function ChatConversationView({
         const deduped = msgs.filter((m) => !existingIds.has(m.id));
         if (deduped.length === 0) return prev;
         const next = [...prev, ...deduped].sort((a, b) => a.ts - b.ts);
-        persistChat(agentPubkey, agent?.name ?? "", agent?.picture, next, pendingJobIdsRef.current);
+        persistChat(agentPubkey, agentNameRef.current, agentPictureRef.current, next, pendingJobIdsRef.current);
         return next;
       });
     },
-    [agentPubkey, agent, persistChat],
+    [agentPubkey, persistChat],
   );
 
   // Auto-ping on first open (skip self)
@@ -173,42 +196,24 @@ export function ChatConversationView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hire.step === "success"]);
 
-  // Toast for hire flow progress
-  const hireToastRef = useRef<string | number | null>(null);
+  // Toast for hire flow progress — uses global store so toasts survive unmount
   useEffect(() => {
     if (hire.step === "submitting") {
-      hireToastRef.current = toast.loading("Submitting job...");
+      setJobToast(agentPubkey, toast.loading("Submitting job..."));
     } else if (hire.step === "paying") {
-      hireToastRef.current = toast.loading("Processing payment...");
+      setJobToast(agentPubkey, toast.loading("Processing payment..."));
     } else if (hire.step === "waiting-result") {
-      if (hireToastRef.current) toast.dismiss(hireToastRef.current);
-      hireToastRef.current = toast.loading("Waiting for agent result...");
+      setJobToast(agentPubkey, toast.loading("Waiting for agent result..."));
     } else if (hire.step === "success") {
-      if (hireToastRef.current) {
-        toast.success("Result received", { id: hireToastRef.current });
-        hireToastRef.current = null;
-      }
+      resolveJobToast(agentPubkey, "Result received");
     } else if (hire.step === "error") {
-      if (hireToastRef.current) {
-        toast.error("Job failed", { id: hireToastRef.current });
-        hireToastRef.current = null;
-      }
+      failJobToast(agentPubkey, "Job failed");
     } else if (hire.step === "payment-required") {
-      if (hireToastRef.current) {
-        toast.dismiss(hireToastRef.current);
-        hireToastRef.current = null;
-      }
+      dismissJobToast(agentPubkey);
       toast("Payment required", { duration: 3000 });
     }
-
-    // On unmount: dismiss active loading toast (result will arrive via background sync)
-    return () => {
-      if (hireToastRef.current) {
-        toast.dismiss(hireToastRef.current);
-        hireToastRef.current = null;
-      }
-    };
-  }, [hire.step]);
+    // No cleanup — toast persists after unmount, resolved by background sync
+  }, [hire.step, agentPubkey]);
 
   // When error arrives
   useEffect(() => {
@@ -284,8 +289,14 @@ export function ChatConversationView({
     await hire.pay(agent.agent);
   }
 
-  const agentName = nostrProfile?.name || agent?.name || truncateKey(nip19.npubEncode(agentPubkey), 8);
-  const agentPicture = nostrProfile?.picture || agent?.picture;
+  const agentName = nostrProfile?.name || agent?.name || convo?.agentName || truncateKey(nip19.npubEncode(agentPubkey), 8);
+  const agentPicture = nostrProfile?.picture || agent?.picture || convo?.agentPicture;
+
+  // Keep refs in sync for use in callbacks (persistChat)
+  const agentNameRef = useRef(agentName);
+  agentNameRef.current = agentName;
+  const agentPictureRef = useRef(agentPicture);
+  agentPictureRef.current = agentPicture;
 
   return (
     <div className="flex flex-col h-full">

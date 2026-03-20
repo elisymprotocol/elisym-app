@@ -23,7 +23,7 @@ function formatDate(ts: number): string {
 }
 
 export function ChatListView() {
-  const { conversations } = useAllConversations();
+  const { conversations, loading } = useAllConversations();
   const { data: rawAgents } = useAgents();
   const displayAgents = useAgentDisplay(rawAgents);
   const [state, dispatch] = useUI();
@@ -44,7 +44,9 @@ export function ChatListView() {
 
       {/* List */}
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        {conversations.length === 0 ? (
+        {loading ? (
+          <div className="text-text-2 text-center py-10 text-sm">Loading...</div>
+        ) : conversations.length === 0 ? (
           <p className="text-text-2 text-center py-10">
             No chats yet.
           </p>
@@ -88,18 +90,18 @@ export function ChatListView() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <div className="text-sm font-semibold truncate">{displayName}</div>
-                      {hasUnread && (
-                        <span className="w-2 h-2 rounded-full bg-error shrink-0" />
-                      )}
-                    </div>
+                    <div className="text-sm font-semibold truncate">{displayName}</div>
                     <span className="text-[11px] text-text-2 shrink-0 ml-2">
                       {formatDate(lastTs)}
                     </span>
                   </div>
-                  <div className="text-xs text-text-2 mt-0.5 truncate">
-                    {lastText?.slice(0, 50)}
+                  <div className="flex items-center justify-between gap-1.5 mt-0.5">
+                    <div className="text-xs text-text-2 truncate">
+                      {lastText?.slice(0, 50)}
+                    </div>
+                    {hasUnread && (
+                      <span className="w-2 h-2 rounded-full bg-error shrink-0" />
+                    )}
                   </div>
                 </div>
               </div>
