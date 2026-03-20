@@ -21,7 +21,7 @@ export function ChatPanel() {
       />
 
       {/* Panel — key resets chat state when identity changes */}
-      <div key={activeId} className="fixed bottom-0 right-0 w-[420px] max-sm:w-screen h-screen bg-surface border-l border-border z-[400] flex flex-col">
+      <div key={activeId} className="fixed bottom-0 right-0 w-[520px] max-sm:w-screen h-screen bg-surface border-l border-border z-[400] flex flex-col">
         {state.activeConversation ? (
           <ChatConversationView agentPubkey={state.activeConversation} />
         ) : (

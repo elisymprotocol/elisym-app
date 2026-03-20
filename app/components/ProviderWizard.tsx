@@ -1,7 +1,8 @@
 import { useRef, useCallback, useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useElisymClient } from "@elisym/sdk/react";
-import { ElisymIdentity, type CapabilityCard } from "@elisym/sdk";
+import { ElisymIdentity, toDTag, type CapabilityCard } from "@elisym/sdk";
 import { useUI } from "~/contexts/UIContext";
 import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
@@ -21,8 +22,8 @@ interface WizProduct {
   tags: string[];
   photoFile: File | null;
   photoPreview: string | null;
-  /** Original name from Nostr — used to detect renames and deletions. */
-  originalName?: string;
+  /** Original d-tag from Nostr — used to detect renames and deletions. */
+  originalDTag?: string;
 }
 
 function getWizData(data: Record<string, unknown>) {
@@ -42,12 +43,13 @@ const CATEGORIES = ["UI/UX", "Summary", "Tools", "Code", "Data"];
 export function ProviderWizard() {
   const [state, dispatch] = useUI();
   const { client } = useElisymClient();
+  const queryClient = useQueryClient();
   const { publicKey } = useWallet();
   const idCtx = useOptionalIdentity();
   const nostrPubkey = idCtx?.publicKey ?? "";
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [publishing, setPublishing] = useState(false);
-  const [removedNames, setRemovedNames] = useState<string[]>([]);
+  const [removedDTags, setRemovedDTags] = useState<string[]>([]);
   const populatedForPubkey = useRef<string | null>(null);
 
   const wiz = getWizData(state.wizardData);
@@ -76,8 +78,8 @@ export function ProviderWizard() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Fetch existing capabilities (kind:31990)
-  const { data: existingCards } = useLocalQuery<CapabilityCard[]>({
+  // Fetch existing capabilities (kind:31990), deduped by actual event d-tag
+  const { data: existingCards } = useLocalQuery<{ card: CapabilityCard; dTag: string }[]>({
     queryKey: ["nostr-capabilities", nostrPubkey],
     queryFn: async () => {
       const events = await client.pool.querySync({
@@ -85,21 +87,21 @@ export function ProviderWizard() {
         authors: [nostrPubkey],
         "#t": ["elisym"],
       } as Filter);
-      const byName = new Map<string, { card: CapabilityCard; ts: number }>();
+      const byDTag = new Map<string, { card: CapabilityCard; dTag: string; ts: number }>();
       for (const ev of events) {
         try {
           const parsed = JSON.parse(ev.content) as CapabilityCard & { deleted?: boolean };
-          // Skip tombstoned (deleted) capabilities
           if (!parsed.name || parsed.deleted) continue;
-          const existing = byName.get(parsed.name);
+          const dTag = ev.tags.find((t: string[]) => t[0] === "d")?.[1] ?? "";
+          const existing = byDTag.get(dTag);
           if (!existing || ev.created_at > existing.ts) {
-            byName.set(parsed.name, { card: parsed, ts: ev.created_at });
+            byDTag.set(dTag, { card: parsed, dTag, ts: ev.created_at });
           }
         } catch {
           // malformed
         }
       }
-      return Array.from(byName.values()).map((e) => e.card);
+      return Array.from(byDTag.values()).map((e) => ({ card: e.card, dTag: e.dTag }));
     },
     enabled: !!nostrPubkey,
     staleTime: 1000 * 60 * 5,
@@ -109,7 +111,7 @@ export function ProviderWizard() {
   useEffect(() => {
     if (!state.wizardOpen) {
       populatedForPubkey.current = null;
-      setRemovedNames([]);
+      setRemovedDTags([]);
     }
   }, [state.wizardOpen]);
 
@@ -127,7 +129,7 @@ export function ProviderWizard() {
       patch.avatarPreview = null;
       patch.avatarFile = null;
       patch.products = [{ name: "", desc: "", price: "", tags: [], photoFile: null, photoPreview: null }];
-      setRemovedNames([]);
+      setRemovedDTags([]);
     }
 
     if (profile) {
@@ -142,7 +144,7 @@ export function ProviderWizard() {
     if (existingCards && existingCards.length > 0) {
       const hasProducts = wiz.products.some((p) => p.name);
       if (identityChanged || !hasProducts) {
-        patch.products = existingCards.map((card) => {
+        patch.products = existingCards.map(({ card, dTag }) => {
           const price = card.payment?.job_price
             ? (card.payment.job_price / 1_000_000_000).toString()
             : "";
@@ -156,7 +158,7 @@ export function ProviderWizard() {
             tags,
             photoFile: null,
             photoPreview: card.image ?? null,
-            originalName: card.name,
+            originalDTag: dTag,
           } satisfies WizProduct;
         });
       }
@@ -208,18 +210,23 @@ export function ProviderWizard() {
         );
       }
 
-      // Delete removed capabilities from Nostr (NIP-09)
-      const namesToDelete = new Set(removedNames);
-      // Also delete old names for renamed products
-      for (const product of wiz.products) {
-        if (product.originalName && product.name && product.originalName !== product.name) {
-          namesToDelete.add(product.originalName);
+      // Comprehensive orphan cleanup: delete any existing d-tags not being republished
+      const currentDTags = new Set(
+        wiz.products.filter((p) => p.name).map((p) => toDTag(p.name)),
+      );
+      const dTagsToDelete = new Set(removedDTags);
+      // Delete existing capabilities whose d-tag won't be republished (handles renames + orphans)
+      if (existingCards) {
+        for (const { dTag } of existingCards) {
+          if (!currentDTags.has(dTag)) {
+            dTagsToDelete.add(dTag);
+          }
         }
       }
-      for (const name of namesToDelete) {
-        await client.discovery.deleteCapability(identity, name);
+      for (const dTag of dTagsToDelete) {
+        await client.discovery.deleteCapability(identity, dTag);
       }
-      setRemovedNames([]);
+      setRemovedDTags([]);
 
       // Get wallet address for payment info
       const walletAddress = publicKey?.toBase58();
@@ -240,7 +247,7 @@ export function ProviderWizard() {
           : ["general"];
 
         const price = product.price
-          ? Math.round(parseFloat(product.price) * 1_000_000_000)
+          ? Math.round(parseFloat(product.price.replace(",", ".")) * 1_000_000_000)
           : undefined;
 
         const payment = walletAddress
@@ -284,6 +291,42 @@ export function ProviderWizard() {
         );
       }
 
+      // Optimistically update capabilities cache with what we just published
+      const publishedCards: { card: CapabilityCard; dTag: string }[] = wiz.products
+        .filter((p) => p.name)
+        .map((p) => {
+          const capabilities = p.tags.length > 0
+            ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-"))
+            : ["general"];
+          const price = p.price
+            ? Math.round(parseFloat(p.price.replace(",", ".")) * 1_000_000_000)
+            : undefined;
+          return {
+            card: {
+              name: p.name,
+              description: p.desc,
+              capabilities,
+              payment: walletAddress
+                ? { chain: "solana" as const, network: "devnet" as const, address: walletAddress, ...(price != null ? { job_price: price } : {}) }
+                : undefined,
+              image: p.photoPreview && !p.photoPreview.startsWith("data:") ? p.photoPreview : undefined,
+            },
+            dTag: toDTag(p.name),
+          };
+        });
+      queryClient.setQueryData(["nostr-capabilities", nostrPubkey], publishedCards);
+
+      if (profileChanged) {
+        queryClient.setQueryData(["nostr-profile", nostrPubkey], {
+          name: wiz.name,
+          about: wiz.desc,
+          picture: avatarUrl,
+        });
+      }
+
+      // Invalidate agents list — relay should have the new events by now
+      void queryClient.invalidateQueries({ queryKey: ["agents"] });
+
       dispatch({ type: "SET_WIZARD_STEP", step: 3 });
     } catch (err) {
       alert(
@@ -308,7 +351,7 @@ export function ProviderWizard() {
       // Reset products to Nostr state so uncommitted removals/edits are discarded
       if (step === 2) {
         populatedForPubkey.current = null;
-        setRemovedNames([]);
+        setRemovedDTags([]);
       }
       dispatch({ type: "SET_WIZARD_STEP", step: step - 1 });
     }
@@ -375,7 +418,7 @@ export function ProviderWizard() {
             onAvatarUpload={handleAvatarUpload}
           />
         )}
-        {step === 2 && <Step2 wiz={wiz} updateData={updateData} onTrackRemoval={(name) => setRemovedNames((prev) => [...prev, name])} />}
+        {step === 2 && <Step2 wiz={wiz} updateData={updateData} onTrackRemoval={(name) => setRemovedDTags((prev) => [...prev, name])} />}
         {step === 3 && (
           <StepSuccess onClose={() => dispatch({ type: "CLOSE_WIZARD" })} />
         )}
@@ -512,8 +555,8 @@ function Step2({
 
   function removeProduct(index: number) {
     const product = wiz.products[index];
-    if (product?.originalName) {
-      onTrackRemoval(product.originalName);
+    if (product?.originalDTag) {
+      onTrackRemoval(product.originalDTag);
     }
     const next = wiz.products.filter((_, j) => j !== index);
     updateData({ products: next });

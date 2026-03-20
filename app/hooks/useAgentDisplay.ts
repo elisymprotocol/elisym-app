@@ -32,9 +32,11 @@ function toDisplayData(agent: Agent): AgentDisplayData {
     new Set(cards.flatMap((c) => c.capabilities || [])),
   );
 
-  // Find the first card with payment info for price display
-  const cardWithPayment = cards.find((c) => c.payment?.job_price != null);
-  const price = cardWithPayment?.payment?.job_price;
+  // Find the minimum price across all cards
+  const prices = cards
+    .map((c) => c.payment?.job_price)
+    .filter((p): p is number => p != null);
+  const price = prices.length > 0 ? Math.min(...prices) : undefined;
 
   // Find any card with a wallet address
   const cardWithAddress = cards.find((c) => c.payment?.address);

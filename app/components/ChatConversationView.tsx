@@ -10,10 +10,12 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { formatSol, truncateKey } from "@elisym/sdk";
 import { nip19 } from "nostr-tools";
 import { uploadToNostrBuild } from "~/lib/uploadImage";
-import type { ChatMessage } from "@elisym/sdk";
+import type { ChatMessage, Agent } from "@elisym/sdk";
+import type { Filter } from "nostr-tools";
 import { useUI } from "~/contexts/UIContext";
 import { useIdentity } from "~/hooks/useIdentity";
 import { useAgentDisplay } from "~/hooks/useAgentDisplay";
+import { useLocalQuery } from "~/hooks/useLocalQuery";
 import { MarbleAvatar } from "./MarbleAvatar";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { ChatInputArea } from "./ChatInputArea";
@@ -34,6 +36,24 @@ export function ChatConversationView({
   const displayAgents = useAgentDisplay(rawAgents);
   const agent = displayAgents.find((a) => a.pubkey === agentPubkey);
 
+  // Fetch kind:0 Nostr profile for the chat peer
+  const { data: nostrProfile } = useLocalQuery<{ name?: string; picture?: string; about?: string } | null>({
+    queryKey: ["nostr-profile", agentPubkey],
+    queryFn: async () => {
+      const events = await client.pool.querySync({
+        kinds: [0],
+        authors: [agentPubkey],
+      } as Filter);
+      const sorted = events.sort((a, b) => b.created_at - a.created_at);
+      if (sorted[0]) {
+        try { return JSON.parse(sorted[0].content); } catch {}
+      }
+      return null;
+    },
+    enabled: !!agentPubkey,
+    staleTime: 1000 * 60 * 5,
+  });
+
   const { messages: storedMessages, loaded } = useChatHistory(agentPubkey);
   const persistChat = usePersistChat();
 
@@ -41,27 +61,42 @@ export function ChatConversationView({
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
   const messagesRef = useRef<HTMLDivElement>(null);
   const [hasPinged, setHasPinged] = useState(false);
+  const [pingStatus, setPingStatus] = useState<"pinging" | "online" | "offline" | null>(null);
 
   const hire = useHireAgent();
 
   // Sync stored messages into local state — merge, don't replace
+  // For self-chat, convert "system" messages to "user" so they show as sent bubbles
   useEffect(() => {
     if (!loaded || storedMessages.length === 0) return;
+    const fixType = (m: ChatMessage): ChatMessage =>
+      isSelf && m.type === "system" ? { ...m, type: "user" } : m;
     setLocalMessages((prev) => {
-      if (prev.length === 0) return [...storedMessages].sort((a, b) => a.ts - b.ts);
+      if (prev.length === 0) return storedMessages.map(fixType).sort((a, b) => a.ts - b.ts);
       const existingIds = new Set(prev.map((m) => m.id));
-      const newOnes = storedMessages.filter((m) => !existingIds.has(m.id));
+      const newOnes = storedMessages.filter((m) => !existingIds.has(m.id)).map(fixType);
       if (newOnes.length === 0) return prev;
       return [...prev, ...newOnes].sort((a, b) => a.ts - b.ts);
     });
   }, [loaded, storedMessages]);
 
-  // Auto-scroll on new messages
+  // Scroll to bottom whenever content height changes (images loading, new messages, etc.)
   useEffect(() => {
-    if (messagesRef.current) {
-      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+    const container = messagesRef.current;
+    if (!container) return;
+
+    const scroll = () => { container.scrollTop = container.scrollHeight; };
+    scroll();
+
+    const observer = new ResizeObserver(scroll);
+    // Observe the scroll content — any child resize (e.g. image load) triggers scroll
+    for (const child of container.children) {
+      observer.observe(child);
     }
-  }, [localMessages, hire.step]);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, [localMessages]);
 
   const appendLocal = useCallback(
     (msgs: ChatMessage[]) => {
@@ -80,29 +115,21 @@ export function ChatConversationView({
   // Auto-ping on first open (skip self)
   const isSelf = agentPubkey === myPubkey;
   useEffect(() => {
-    if (!agent || hasPinged || hire.step !== "idle" || isSelf) {
+    if (hasPinged || hire.step !== "idle" || isSelf) {
       return;
     }
     setHasPinged(true);
+    setPingStatus("pinging");
 
-    const doPing = async () => {
-      await hire.ping(agent.agent);
-    };
-    void doPing();
+    // hire.ping only uses agent.pubkey — pass minimal object to avoid waiting for agent list
+    void hire.ping({ pubkey: agentPubkey } as Agent);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agent, hasPinged, isSelf]);
+  }, [hasPinged, isSelf]);
 
-  // Update messages when ping completes
+  // Update ping status when ping completes
   useEffect(() => {
     if (hire.step === "online" || hire.step === "offline") {
-      appendLocal([
-        {
-          type: "ping",
-          id: crypto.randomUUID(),
-          ts: Date.now(),
-          online: hire.step === "online",
-        },
-      ]);
+      setPingStatus(hire.step);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hire.step === "online", hire.step === "offline"]);
@@ -206,8 +233,8 @@ export function ChatConversationView({
     await hire.pay(agent.agent);
   }
 
-  const agentName = agent?.name || truncateKey(nip19.npubEncode(agentPubkey), 8);
-  const agentPicture = agent?.picture;
+  const agentName = nostrProfile?.name || agent?.name || truncateKey(nip19.npubEncode(agentPubkey), 8);
+  const agentPicture = nostrProfile?.picture || agent?.picture;
 
   return (
     <div className="flex flex-col h-full">
@@ -234,6 +261,15 @@ export function ChatConversationView({
             )}
           </div>
           <strong className="text-[15px]">{agentName}</strong>
+          {pingStatus === "pinging" && (
+            <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Pinging..." />
+          )}
+          {pingStatus === "online" && (
+            <span className="w-2 h-2 rounded-full bg-green-400" title="Online" />
+          )}
+          {pingStatus === "offline" && (
+            <span className="w-2 h-2 rounded-full bg-red-400/60" title="Offline" />
+          )}
         </div>
         <div className="flex items-center gap-2">
           {agent && (
@@ -303,11 +339,7 @@ function renderHireStatus(
 ) {
   switch (hire.step) {
     case "pinging":
-      return (
-        <div className="max-w-[80%] py-2.5 px-3.5 rounded-xl bg-surface-2 self-start text-[13.5px] italic">
-          Pinging agent...
-        </div>
-      );
+      return null;
     case "submitting":
       return (
         <div className="max-w-[80%] py-2.5 px-3.5 rounded-xl bg-surface-2 self-start text-[13.5px] italic">

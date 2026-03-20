@@ -30,6 +30,7 @@ export function AgentCard({ agent }: AgentCardProps) {
     dispatch({ type: "OPEN_CHAT" });
     dispatch({ type: "SET_CHAT_TAB", tab: "customer" });
     dispatch({ type: "SET_ACTIVE_CONVERSATION", pubkey: agent.pubkey });
+    dispatch({ type: "SET_CONV_TAB", tab: "services" });
   }, [agent, client, dispatch]);
 
   return (

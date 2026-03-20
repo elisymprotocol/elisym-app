@@ -66,9 +66,6 @@ function ssrNativeModules(): Plugin {
 }
 
 export default defineConfig({
-  resolve: {
-    dedupe: ["react", "react-dom"],
-  },
   plugins: [
     bufferShimFix(),
     tailwindcss(),

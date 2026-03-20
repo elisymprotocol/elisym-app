@@ -36,6 +36,9 @@ function IdentitySync() {
   // Profile cache for sender names/pictures
   const profileCache = useRef<Map<string, { name: string; picture?: string }>>(new Map());
 
+  // Per-sender cooldown for ping responses (1s)
+  const lastPingRef = useRef<Map<string, number>>(new Map());
+
   // Global DM listener — re-subscribes when identity changes
   useEffect(() => {
     if (!identity) return;
@@ -65,15 +68,25 @@ function IdentitySync() {
     const sub = client.messaging.subscribeToMessages(
       identity,
       (senderPubkey: string, content: string, createdAt: number, rumorId: string) => {
-        // Skip protocol messages
+        // Handle protocol messages
         try {
           const msg = JSON.parse(content);
-          if (msg.type === "elisym_ping" || msg.type === "elisym_pong") return;
+          if (msg.type === "elisym_ping") {
+            const now = Date.now();
+            const lastPing = lastPingRef.current.get(senderPubkey) ?? 0;
+            if (now - lastPing < 1000) return;
+            lastPingRef.current.set(senderPubkey, now);
+            const pong = JSON.stringify({ type: "elisym_pong", nonce: msg.nonce });
+            void client.messaging.sendMessage(identity!, senderPubkey, pong);
+            return;
+          }
+          if (msg.type === "elisym_pong") return;
         } catch {
           // not JSON — regular text
         }
 
         const ts = createdAt * 1000; // Nostr seconds → ms
+        const isSelf = senderPubkey === identity!.publicKey;
 
         void resolveProfile(senderPubkey).then((profile) => {
           client.chatDb.appendMessages(
@@ -82,7 +95,7 @@ function IdentitySync() {
             profile.picture,
             [
               {
-                type: "system",
+                type: isSelf ? "user" : "system",
                 id: rumorId,
                 ts,
                 text: content,
