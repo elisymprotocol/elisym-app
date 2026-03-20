@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useElisymClient } from "@elisym/sdk/react";
 import { ElisymIdentity } from "@elisym/sdk";
+import { toast } from "sonner";
 import { useOptionalIdentity } from "./useIdentity";
 import type { Event } from "nostr-tools";
 
@@ -80,7 +81,7 @@ export function useAutoResponder() {
 
         client.marketplace
           .submitJobResult(identity, event, "hello")
-          .catch(console.error);
+          .catch(() => toast.error("Failed to process job"));
 
         addActivity({
           id: event.id,
@@ -147,6 +148,7 @@ export function useAutoResponder() {
     subsRef.current.push(dmSub);
 
     setOnline(true);
+    toast.success("Provider mode active");
   }, [client, addActivity, idCtx?.identity]);
 
   const goOffline = useCallback(() => {

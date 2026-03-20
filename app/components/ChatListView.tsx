@@ -3,6 +3,7 @@ import { truncateKey } from "@elisym/sdk";
 import { nip19 } from "nostr-tools";
 import { useUI } from "~/contexts/UIContext";
 import { useAgentDisplay } from "~/hooks/useAgentDisplay";
+import { useUnreadCounts } from "~/hooks/useUnreadCounts";
 import { MarbleAvatar } from "./MarbleAvatar";
 
 function formatDate(ts: number): string {
@@ -26,6 +27,7 @@ export function ChatListView() {
   const { data: rawAgents } = useAgents();
   const displayAgents = useAgentDisplay(rawAgents);
   const [state, dispatch] = useUI();
+  const { unreadByPubkey } = useUnreadCounts();
 
   return (
     <>
@@ -52,6 +54,7 @@ export function ChatListView() {
             const npub = nip19.npubEncode(c.agentPubkey);
             const displayName = knownAgent?.name || c.agentName || truncateKey(npub, 8);
             const picture = knownAgent?.picture || c.agentPicture;
+            const hasUnread = !!unreadByPubkey[c.agentPubkey];
             const lastMsg =
               c.messages.length > 0
                 ? c.messages[c.messages.length - 1]
@@ -85,7 +88,12 @@ export function ChatListView() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold truncate">{displayName}</div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-sm font-semibold truncate">{displayName}</div>
+                      {hasUnread && (
+                        <span className="w-2 h-2 rounded-full bg-error shrink-0" />
+                      )}
+                    </div>
                     <span className="text-[11px] text-text-2 shrink-0 ml-2">
                       {formatDate(lastTs)}
                     </span>

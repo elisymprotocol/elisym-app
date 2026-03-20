@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Filter } from "nostr-tools";
+import { nip19 } from "nostr-tools";
 import {
   ConnectionProvider,
   WalletProvider,
@@ -9,13 +10,43 @@ import { PhantomWalletAdapter } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
 import { ElisymProvider, useElisymClient } from "@elisym/sdk/react";
 import { usePendingJobSync } from "@elisym/sdk/react";
-import { UIProvider } from "~/contexts/UIContext";
+import { toast } from "sonner";
+import { truncateKey } from "@elisym/sdk";
+import { UIProvider, useUI } from "~/contexts/UIContext";
 import { IdentityProvider, useOptionalIdentity } from "~/hooks/useIdentity";
 
 const queryClient = new QueryClient();
 
 function PendingJobSyncRunner() {
   usePendingJobSync();
+  const { client } = useElisymClient();
+  const [uiState] = useUI();
+  const uiRef = useRef(uiState);
+  uiRef.current = uiState;
+
+  // Track message counts to detect new results from background sync
+  const prevCountsRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    return client.chatDb.onConversationChange(() => {
+      void client.chatDb.getAllConversations().then((convos) => {
+        for (const convo of convos) {
+          const resultCount = convo.messages.filter((m) => m.type === "result").length;
+          const prevCount = prevCountsRef.current.get(convo.agentPubkey) ?? 0;
+
+          if (resultCount > prevCount && prevCount > 0) {
+            // New result arrived — toast if not viewing that conversation
+            if (uiRef.current.activeConversation !== convo.agentPubkey) {
+              const name = convo.agentName || truncateKey(nip19.npubEncode(convo.agentPubkey), 8);
+              toast.success(`${name}: result received`);
+            }
+          }
+          prevCountsRef.current.set(convo.agentPubkey, resultCount);
+        }
+      });
+    });
+  }, [client]);
+
   return null;
 }
 
@@ -25,6 +56,7 @@ function IdentitySync() {
   const idCtx = useOptionalIdentity();
   const pubkey = idCtx?.publicKey;
   const identity = idCtx?.identity;
+  const [uiState] = useUI();
 
   // Switch chatDb to active identity
   useEffect(() => {
@@ -32,6 +64,10 @@ function IdentitySync() {
       client.chatDb.setOwner(pubkey);
     }
   }, [client, pubkey]);
+
+  // Keep UI state in ref so subscription callback sees latest value
+  const uiRef = useRef(uiState);
+  uiRef.current = uiState;
 
   // Profile cache for sender names/pictures
   const profileCache = useRef<Map<string, { name: string; picture?: string }>>(new Map());
@@ -102,6 +138,13 @@ function IdentitySync() {
               },
             ],
           );
+
+          // Toast for incoming messages (skip if viewing that conversation)
+          if (!isSelf && uiRef.current.activeConversation !== senderPubkey) {
+            const name = profile.name || truncateKey(nip19.npubEncode(senderPubkey), 8);
+            const preview = content.length > 60 ? content.slice(0, 60) + "…" : content;
+            toast(`${name}: ${preview}`, { duration: 4000 });
+          }
         });
       },
     );

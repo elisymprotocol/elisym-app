@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useElisymClient } from "@elisym/sdk/react";
 import { ElisymIdentity, toDTag, type CapabilityCard } from "@elisym/sdk";
+import { toast } from "sonner";
 import { useUI } from "~/contexts/UIContext";
 import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
@@ -324,12 +325,20 @@ export function ProviderWizard() {
         });
       }
 
-      // Invalidate agents list — relay should have the new events by now
-      void queryClient.invalidateQueries({ queryKey: ["agents"] });
+      toast.success("Published!");
 
+      // Refetch agents list from relays — show progress via toast
+      toast.promise(
+        queryClient.refetchQueries({ queryKey: ["agents"] }),
+        {
+          loading: "Syncing with relays...",
+          success: "Marketplace updated",
+          error: "Sync failed — will retry shortly",
+        },
+      );
       dispatch({ type: "SET_WIZARD_STEP", step: 3 });
     } catch (err) {
-      alert(
+      toast.error(
         "Failed to publish: " +
           (err instanceof Error ? err.message : "Unknown error"),
       );

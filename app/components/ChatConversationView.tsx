@@ -9,6 +9,7 @@ import { useElisymClient } from "@elisym/sdk/react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { formatSol, truncateKey } from "@elisym/sdk";
 import { nip19 } from "nostr-tools";
+import { toast } from "sonner";
 import { uploadToNostrBuild } from "~/lib/uploadImage";
 import type { ChatMessage, Agent } from "@elisym/sdk";
 import type { Filter } from "nostr-tools";
@@ -16,6 +17,7 @@ import { useUI } from "~/contexts/UIContext";
 import { useIdentity } from "~/hooks/useIdentity";
 import { useAgentDisplay } from "~/hooks/useAgentDisplay";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
+import { useUnreadCounts } from "~/hooks/useUnreadCounts";
 import { MarbleAvatar } from "./MarbleAvatar";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { ChatInputArea } from "./ChatInputArea";
@@ -54,16 +56,35 @@ export function ChatConversationView({
     staleTime: 1000 * 60 * 5,
   });
 
-  const { messages: storedMessages, loaded } = useChatHistory(agentPubkey);
+  const { messages: storedMessages, pendingJobIds, loaded } = useChatHistory(agentPubkey);
   const persistChat = usePersistChat();
 
   // Local messages state — starts from stored, appended locally
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
+  const localMessagesRef = useRef<ChatMessage[]>([]);
+  localMessagesRef.current = localMessages;
   const messagesRef = useRef<HTMLDivElement>(null);
   const [hasPinged, setHasPinged] = useState(false);
   const [pingStatus, setPingStatus] = useState<"pinging" | "online" | "offline" | null>(null);
+  const pendingJobIdsRef = useRef<string[]>([]);
 
-  const hire = useHireAgent();
+  // Keep pending job IDs in sync from stored data
+  useEffect(() => {
+    if (loaded) pendingJobIdsRef.current = pendingJobIds;
+  }, [loaded, pendingJobIds]);
+
+  const hire = useHireAgent({
+    onJobCreated(jobId) {
+      pendingJobIdsRef.current = [...pendingJobIdsRef.current, jobId];
+      persistChat(agentPubkey, agent?.name ?? "", agent?.picture, localMessagesRef.current, pendingJobIdsRef.current);
+    },
+  });
+  const { markRead } = useUnreadCounts();
+
+  // Mark conversation as read on open
+  useEffect(() => {
+    markRead(agentPubkey);
+  }, [agentPubkey, markRead]);
 
   // Sync stored messages into local state — merge, don't replace
   // For self-chat, convert "system" messages to "user" so they show as sent bubbles
@@ -78,7 +99,9 @@ export function ChatConversationView({
       if (newOnes.length === 0) return prev;
       return [...prev, ...newOnes].sort((a, b) => a.ts - b.ts);
     });
-  }, [loaded, storedMessages]);
+    // Mark as read when new messages arrive while conversation is open
+    markRead(agentPubkey);
+  }, [loaded, storedMessages, markRead, agentPubkey]);
 
   // Scroll to bottom whenever content height changes (images loading, new messages, etc.)
   useEffect(() => {
@@ -105,7 +128,7 @@ export function ChatConversationView({
         const deduped = msgs.filter((m) => !existingIds.has(m.id));
         if (deduped.length === 0) return prev;
         const next = [...prev, ...deduped].sort((a, b) => a.ts - b.ts);
-        persistChat(agentPubkey, agent?.name ?? "", agent?.picture, next, []);
+        persistChat(agentPubkey, agent?.name ?? "", agent?.picture, next, pendingJobIdsRef.current);
         return next;
       });
     },
@@ -150,6 +173,43 @@ export function ChatConversationView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hire.step === "success"]);
 
+  // Toast for hire flow progress
+  const hireToastRef = useRef<string | number | null>(null);
+  useEffect(() => {
+    if (hire.step === "submitting") {
+      hireToastRef.current = toast.loading("Submitting job...");
+    } else if (hire.step === "paying") {
+      hireToastRef.current = toast.loading("Processing payment...");
+    } else if (hire.step === "waiting-result") {
+      if (hireToastRef.current) toast.dismiss(hireToastRef.current);
+      hireToastRef.current = toast.loading("Waiting for agent result...");
+    } else if (hire.step === "success") {
+      if (hireToastRef.current) {
+        toast.success("Result received", { id: hireToastRef.current });
+        hireToastRef.current = null;
+      }
+    } else if (hire.step === "error") {
+      if (hireToastRef.current) {
+        toast.error("Job failed", { id: hireToastRef.current });
+        hireToastRef.current = null;
+      }
+    } else if (hire.step === "payment-required") {
+      if (hireToastRef.current) {
+        toast.dismiss(hireToastRef.current);
+        hireToastRef.current = null;
+      }
+      toast("Payment required", { duration: 3000 });
+    }
+
+    // On unmount: dismiss active loading toast (result will arrive via background sync)
+    return () => {
+      if (hireToastRef.current) {
+        toast.dismiss(hireToastRef.current);
+        hireToastRef.current = null;
+      }
+    };
+  }, [hire.step]);
+
   // When error arrives
   useEffect(() => {
     if (hire.step === "error" && hire.error) {
@@ -170,18 +230,16 @@ export function ChatConversationView({
 
     // Upload file if attached
     if (file) {
+      const uploadPromise = uploadToNostrBuild(file, myIdentity);
+      toast.promise(uploadPromise, {
+        loading: `Uploading ${file.name}...`,
+        success: "File uploaded",
+        error: "File upload failed",
+      });
       try {
-        appendLocal([
-          { type: "system", id: crypto.randomUUID(), ts: Date.now(), text: `Uploading ${file.name}...`, loading: true },
-        ]);
-        const fileUrl = await uploadToNostrBuild(file, myIdentity);
+        const fileUrl = await uploadPromise;
         msgText = msgText ? `${msgText}\n${fileUrl}` : fileUrl;
-        // Remove uploading indicator
-        setLocalMessages((prev) => prev.filter((m) => !m.loading));
       } catch (_err) {
-        appendLocal([
-          { type: "error", id: crypto.randomUUID(), ts: Date.now(), text: "File upload failed" },
-        ]);
         return;
       }
     }
@@ -218,14 +276,7 @@ export function ChatConversationView({
         }
         await connect();
       } catch (_err) {
-        appendLocal([
-          {
-            type: "error",
-            id: crypto.randomUUID(),
-            ts: Date.now(),
-            text: "Wallet connection failed",
-          },
-        ]);
+        toast.error("Failed to connect wallet");
         return;
       }
     }

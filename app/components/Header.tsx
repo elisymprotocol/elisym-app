@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { truncateKey } from "@elisym/sdk";
+import { toast } from "sonner";
 import { MarbleAvatar } from "./MarbleAvatar";
 
 export function Header() {
@@ -32,7 +33,7 @@ export function Header() {
       }
       await connect();
     } catch (_err) {
-      // User rejected or wallet not installed
+      toast.error("Failed to connect wallet");
     }
   }
 

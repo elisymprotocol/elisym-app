@@ -25,7 +25,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <ChatFab />
           <ChatPanel />
           <ProviderWizard />
-          <Toaster theme="dark" position="bottom-right" />
+          <Toaster theme="dark" position="bottom-left" />
         </Providers>
         <ScrollRestoration />
         <Scripts />

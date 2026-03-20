@@ -1,10 +1,9 @@
-import { useAllConversations } from "@elisym/sdk/react";
 import { useUI } from "~/contexts/UIContext";
+import { useUnreadCounts } from "~/hooks/useUnreadCounts";
 
 export function ChatFab() {
-  const { conversations } = useAllConversations();
+  const { totalUnread } = useUnreadCounts();
   const [, dispatch] = useUI();
-  const count = conversations.length;
 
   return (
     <button
@@ -14,9 +13,9 @@ export function ChatFab() {
       <span role="img" aria-label="chat">
         💬
       </span>
-      {count > 0 && (
-        <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-error text-white text-[11px] font-bold flex items-center justify-center">
-          {count}
+      {totalUnread > 0 && (
+        <div className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-error text-white text-[11px] font-bold flex items-center justify-center">
+          {totalUnread > 99 ? "99+" : totalUnread}
         </div>
       )}
     </button>
