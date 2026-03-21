@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAgents } from "~/hooks/useAgents";
 import { useAgentDisplay } from "~/hooks/useAgentDisplay";
 import { useStats } from "~/hooks/useStats";
@@ -9,7 +8,6 @@ import { StatsBar } from "~/components/StatsBar";
 import { FilterBar, KNOWN_CATEGORIES } from "~/components/FilterBar";
 import { AgentCard } from "~/components/AgentCard";
 import { toast } from "sonner";
-import type { AgentDisplayData } from "~/hooks/useAgentDisplay";
 
 const RELAYS = [
   "wss://relay.damus.io",
@@ -161,81 +159,14 @@ function BootLog({ lines }: { lines: LogLine[] }) {
   );
 }
 
-const COL_MIN_WIDTH = 320;
-const GAP = 20;
-const ROW_HEIGHT = 290;
-
-function useColumns(containerRef: React.RefObject<HTMLDivElement | null>) {
-  const [cols, setCols] = useState(3);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const update = () => {
-      const width = el.clientWidth;
-      setCols(Math.max(1, Math.floor((width + GAP) / (COL_MIN_WIDTH + GAP))));
-    };
-
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [containerRef]);
-
-  return cols;
-}
-
-function VirtualGrid({ agents }: { agents: AgentDisplayData[] }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const cols = useColumns(containerRef);
-  const rowCount = Math.ceil(agents.length / cols);
-
-  const virtualizer = useVirtualizer({
-    count: rowCount,
-    getScrollElement: () => document.documentElement,
-    estimateSize: () => ROW_HEIGHT + GAP,
-    overscan: 3,
-  });
-
-  return (
-    <div ref={containerRef}>
-      <div
-        style={{ height: virtualizer.getTotalSize(), position: "relative" }}
-      >
-        {virtualizer.getVirtualItems().map((virtualRow) => {
-          const startIdx = virtualRow.index * cols;
-          const rowAgents = agents.slice(startIdx, startIdx + cols);
-
-          return (
-            <div
-              key={virtualRow.index}
-              style={{
-                position: "absolute",
-                top: virtualRow.start,
-                left: 0,
-                right: 0,
-                display: "grid",
-                gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                gap: GAP,
-              }}
-            >
-              {rowAgents.map((agent) => (
-                <AgentCard key={agent.pubkey} agent={agent} />
-              ))}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+const PAGE_SIZE = 18;
 
 export default function Home() {
   const { data: agents, isLoading: agentsLoading, fromCache: agentsFromCache, isFetchedAfterMount: agentsSynced } = useAgents();
   const { data: stats, isLoading: statsLoading, fromCache: statsFromCache, isFetchedAfterMount: statsSynced } = useStats();
   const displayAgents = useAgentDisplay(agents ?? []);
   const [state] = useUI();
+  const [page, setPage] = useState(1);
 
   // Cold start = no cached data at all
   const isColdStart = agentsLoading && !agentsFromCache;
@@ -265,6 +196,19 @@ export default function Home() {
             ),
           );
 
+  // Reset to page 1 when filter changes
+  const prevFilter = useRef(state.currentFilter);
+  useEffect(() => {
+    if (prevFilter.current !== state.currentFilter) {
+      prevFilter.current = state.currentFilter;
+      setPage(1);
+    }
+  }, [state.currentFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   if (isColdStart) {
     return (
       <>
@@ -287,7 +231,45 @@ export default function Home() {
             No agents found for this category.
           </p>
         ) : (
-          <VirtualGrid agents={filtered} />
+          <>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-5">
+              {paged.map((agent) => (
+                <AgentCard key={agent.pubkey} agent={agent} />
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  className="py-2 px-4 rounded-lg border border-border bg-surface text-sm font-medium text-text-2 hover:border-accent hover:text-text disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                >
+                  Prev
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`size-9 rounded-lg border text-sm font-medium transition-colors ${
+                      p === safePage
+                        ? "bg-accent border-accent text-white"
+                        : "bg-surface border-border text-text-2 hover:border-accent hover:text-text"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  className="py-2 px-4 rounded-lg border border-border bg-surface text-sm font-medium text-text-2 hover:border-accent hover:text-text disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </>

@@ -9,8 +9,14 @@ import { clusterApiUrl } from "@solana/web3.js";
 import { ElisymProvider } from "~/hooks/useElisymClient";
 import { UIProvider } from "~/contexts/UIContext";
 import { IdentityProvider } from "~/hooks/useIdentity";
+import { useHeartbeat } from "~/hooks/useHeartbeat";
 
 const queryClient = new QueryClient();
+
+function Heartbeat({ children }: { children: ReactNode }) {
+  useHeartbeat();
+  return <>{children}</>;
+}
 
 export function Providers({ children }: { children: ReactNode }) {
   const endpoint = useMemo(() => clusterApiUrl("devnet"), []);
@@ -22,9 +28,11 @@ export function Providers({ children }: { children: ReactNode }) {
         <WalletProvider wallets={wallets} autoConnect>
           <ElisymProvider config={{ network: "devnet" }}>
             <IdentityProvider>
-              <UIProvider>
-                {children}
-              </UIProvider>
+              <Heartbeat>
+                <UIProvider>
+                  {children}
+                </UIProvider>
+              </Heartbeat>
             </IdentityProvider>
           </ElisymProvider>
         </WalletProvider>

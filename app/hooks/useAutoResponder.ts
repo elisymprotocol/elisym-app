@@ -3,7 +3,6 @@ import { useElisymClient } from "./useElisymClient";
 import { ElisymIdentity } from "@elisym/sdk";
 import { toast } from "sonner";
 import { useOptionalIdentity } from "./useIdentity";
-import type { Event } from "nostr-tools";
 
 type SubCloser = { close: (reason?: string) => void };
 
@@ -41,6 +40,7 @@ export function useAutoResponder() {
   const [online, setOnline] = useState(false);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const subsRef = useRef<SubCloser[]>([]);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onlineRef = useRef(false);
   const lastPingRef = useRef<Map<string, number>>(new Map());
 
@@ -71,29 +71,17 @@ export function useAutoResponder() {
       });
     }
 
-    // Subscribe to job requests (kind:5100)
-    const jobSub = client.marketplace.subscribeToJobRequests(
-      identity,
-      [5100],
-      (event: Event) => {
-        const inputTag = event.tags.find((t) => t[0] === "i");
-        const preview = (inputTag?.[1] ?? event.content ?? "").slice(0, 80);
-
-        client.marketplace
-          .submitJobResult(identity, event, "hello")
-          .catch(() => toast.error("Failed to process job"));
-
-        addActivity({
-          id: event.id,
-          timestamp: Math.floor(Date.now() / 1000),
-          type: "job",
-          senderPubkey: event.pubkey,
-          preview,
-          response: "hello",
-        });
-      },
-    );
-    subsRef.current.push(jobSub);
+    // Heartbeat: republish last capability every 60s to stay fresh in listings
+    const lastCard = cards[cards.length - 1]!;
+    heartbeatRef.current = setInterval(() => {
+      client.discovery
+        .publishCapability(identity, {
+          name: lastCard.name,
+          description: lastCard.description,
+          capabilities: lastCard.capabilities,
+        })
+        .catch(console.error);
+    }, 60_000);
 
     // Subscribe to DMs (NIP-17) for ping/pong liveness only
     const dmSub = client.messaging.subscribeToMessages(
@@ -140,6 +128,10 @@ export function useAutoResponder() {
       sub.close();
     }
     subsRef.current = [];
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
     setOnline(false);
   }, []);
 
@@ -150,6 +142,10 @@ export function useAutoResponder() {
         sub.close();
       }
       subsRef.current = [];
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
     };
   }, []);
 
