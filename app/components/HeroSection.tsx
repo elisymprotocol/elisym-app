@@ -14,10 +14,10 @@ export function HeroSection() {
           and settle payments — no platform, no middleman.
         </p>
         <button
-          onClick={() => dispatch({ type: "OPEN_WIZARD" })}
+          onClick={() => dispatch({ type: "OPEN_WIZARD", tab: 2 })}
           className="btn btn-primary mt-6 py-3.5 px-8 text-sm"
         >
-          Manage Profile
+          Start Selling
         </button>
       </section>
     </div>

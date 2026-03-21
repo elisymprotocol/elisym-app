@@ -15,7 +15,7 @@ interface UIState {
 
 type UIAction =
   | { type: "SET_FILTER"; filter: string }
-  | { type: "OPEN_WIZARD" }
+  | { type: "OPEN_WIZARD"; tab?: number }
   | { type: "CLOSE_WIZARD" }
   | { type: "SET_WIZARD_STEP"; step: number }
   | { type: "UPDATE_WIZARD_DATA"; data: Record<string, unknown> };
@@ -40,7 +40,7 @@ function uiReducer(state: UIState, action: UIAction): UIState {
     case "SET_FILTER":
       return { ...state, currentFilter: action.filter };
     case "OPEN_WIZARD":
-      return { ...state, wizardOpen: true, wizardStep: 1 };
+      return { ...state, wizardOpen: true, wizardStep: action.tab ?? 1 };
     case "CLOSE_WIZARD":
       return {
         ...state,

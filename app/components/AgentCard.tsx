@@ -35,12 +35,12 @@ export function AgentCard({ agent }: AgentCardProps) {
               <MarbleAvatar name={agent.pubkey} size={48} />
             )}
           </div>
-          <div className="text-base font-semibold">
+          <div className="text-base font-semibold truncate">
             {agent.name || truncateKey(nip19.npubEncode(agent.pubkey), 8)}
           </div>
         </div>
 
-        <div className="text-text-2 text-sm leading-relaxed">
+        <div className="text-text-2 text-sm leading-relaxed line-clamp-3">
           {agent.description}
         </div>
 

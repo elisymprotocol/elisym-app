@@ -445,6 +445,7 @@ function Step1({
         <input
           className="w-full py-3 px-3.5 rounded-[10px] border border-border bg-surface-2 text-text text-sm outline-none transition-colors focus:border-accent"
           placeholder="John Doe"
+          maxLength={100}
           value={wiz.name}
           onChange={(e) => updateData({ name: e.target.value })}
         />
@@ -496,6 +497,7 @@ function Step1({
         <textarea
           className="w-full py-3 px-3.5 rounded-[10px] border border-border bg-surface-2 text-text text-sm outline-none resize-y min-h-20 font-[inherit] transition-colors focus:border-accent"
           placeholder="What do you offer? What makes you unique?"
+          maxLength={280}
           value={wiz.desc}
           onChange={(e) => updateData({ desc: e.target.value })}
         />
@@ -650,6 +652,7 @@ function ProductCard({
           <input
             className="w-full py-3 px-3.5 rounded-[10px] border border-border bg-surface text-text text-sm outline-none focus:border-accent"
             placeholder="e.g. Landing page design"
+            maxLength={100}
             value={product.name}
             onChange={(e) => onUpdate(index, { name: e.target.value })}
           />
@@ -677,6 +680,7 @@ function ProductCard({
         <textarea
           className="w-full py-3 px-3.5 rounded-[10px] border border-border bg-surface text-text text-sm outline-none resize-y min-h-[50px] font-[inherit] focus:border-accent"
           placeholder="What's included?"
+          maxLength={280}
           value={product.desc}
           onChange={(e) => onUpdate(index, { desc: e.target.value })}
         />

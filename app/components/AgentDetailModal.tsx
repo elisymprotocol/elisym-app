@@ -35,8 +35,8 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
     >
       <div className="bg-surface border border-border rounded-[18px] w-[560px] max-w-[95vw] max-h-[90vh] overflow-y-auto p-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+        <div className="flex items-start justify-between mb-6 gap-3">
+          <div className="flex items-start gap-4 min-w-0">
             <div className="size-14 rounded-full shrink-0 overflow-hidden flex items-center justify-center">
               {agent.picture ? (
                 <img
@@ -48,9 +48,11 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
                 <MarbleAvatar name={agent.pubkey} size={56} />
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-xl font-bold flex items-center gap-2">
-                {agent.name || truncateKey(nip19.npubEncode(agent.pubkey), 8)}
+                <span>
+                  {(() => { const n = agent.name || truncateKey(nip19.npubEncode(agent.pubkey), 8); return n.length > 100 ? n.slice(0, 100) + "..." : n; })()}
+                </span>
                 <span className={`size-2.5 rounded-full shrink-0 ${STATUS_DOT[pingStatus]}`} />
               </h2>
               <div className="font-mono text-xs text-text-2 mt-0.5">
@@ -69,7 +71,9 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
         {/* About */}
         {agent.description && (
           <div className="text-sm text-text-2 leading-relaxed mb-6">
-            {agent.description}
+            {agent.description.length > 280
+              ? agent.description.slice(0, 280) + "..."
+              : agent.description}
           </div>
         )}
 
@@ -161,7 +165,9 @@ function CapabilityItem({
 
       <div className="p-4">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <div className="text-sm font-semibold truncate">{card.name}</div>
+          <div className="text-sm font-semibold">
+            {card.name.length > 100 ? card.name.slice(0, 100) + "..." : card.name}
+          </div>
           {price != null && (
             <div className="text-sm font-bold text-green shrink-0">
               {formatSol(price)}
@@ -170,7 +176,7 @@ function CapabilityItem({
         </div>
         {card.description && (
           <div className="text-xs text-text-2 leading-relaxed mb-2">
-            {card.description}
+            {card.description.length > 280 ? card.description.slice(0, 280) + "..." : card.description}
           </div>
         )}
         {card.capabilities.length > 0 && (

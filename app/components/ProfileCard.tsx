@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { truncateKey } from "@elisym/sdk";
 import { useElisymClient } from "~/hooks/useElisymClient";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
+import { useUI } from "~/contexts/UIContext";
 import { getCachedImage, cacheImage } from "~/lib/localCache";
 import { MarbleAvatar } from "./MarbleAvatar";
 import type { Filter } from "nostr-tools";
@@ -20,6 +21,7 @@ interface ProfileCardProps {
 
 export function ProfileCard({ npub, pubkey, keyName }: ProfileCardProps) {
   const { client } = useElisymClient();
+  const [, dispatch] = useUI();
 
   const { data: profile, isLoading } = useLocalQuery<NostrProfile | null>({
     queryKey: ["nostr-profile", pubkey],
@@ -115,7 +117,7 @@ export function ProfileCard({ npub, pubkey, keyName }: ProfileCardProps) {
 
   return (
     <div className="bg-surface border border-border rounded-2xl p-8 mb-6">
-      <div className="flex items-center gap-5 max-sm:flex-col max-sm:text-center">
+      <div className="flex items-center gap-5 max-sm:flex-col max-sm:text-center relative">
         <div className="w-20 h-20 rounded-full overflow-hidden shrink-0 flex items-center justify-center">
           {isLoading ? (
             <div className="w-20 h-20 rounded-full bg-border animate-pulse" />
@@ -130,17 +132,27 @@ export function ProfileCard({ npub, pubkey, keyName }: ProfileCardProps) {
           )}
         </div>
         <div className="flex-1 min-w-0">
-          {isLoading ? (
-            <div className="h-7 w-40 bg-border rounded animate-pulse mb-1" />
-          ) : (
-            <h1 className="text-2xl font-bold mb-1">{displayName}</h1>
-          )}
+          <div className="flex items-center justify-between gap-3">
+            {isLoading ? (
+              <div className="h-7 w-40 bg-border rounded animate-pulse mb-1" />
+            ) : (
+              <h1 className="text-2xl font-bold mb-1 truncate">{displayName}</h1>
+            )}
+            <button
+              onClick={() => dispatch({ type: "OPEN_WIZARD", tab: 1 })}
+              className="py-2 px-5 rounded-[10px] border-none bg-accent text-white text-xs font-semibold cursor-pointer hover:bg-accent-hover transition-colors shrink-0"
+            >
+              Manage Profile
+            </button>
+          </div>
           <div className="font-mono text-[13px] text-text-2 mb-1">
             {npubDisplay}
           </div>
           {!isLoading && profile?.about && (
             <div className="text-sm text-text-2 leading-relaxed mt-2">
-              {profile.about}
+              {profile.about.length > 280
+                ? profile.about.slice(0, 280) + "..."
+                : profile.about}
             </div>
           )}
         </div>
