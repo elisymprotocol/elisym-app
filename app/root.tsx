@@ -21,7 +21,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <main className="flex-1">{children}</main>
           <Footer />
           <ProviderWizard />
-          <Toaster theme="dark" position="bottom-left" />
+          <Toaster
+            theme="light"
+            position="bottom-right"
+            duration={1500}
+            toastOptions={{
+              style: {
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text-2)",
+                fontSize: "13px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              },
+            }}
+          />
         </Providers>
         <ScrollRestoration />
         <Scripts />
