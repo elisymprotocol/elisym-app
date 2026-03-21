@@ -112,41 +112,30 @@ export function useAutoResponder() {
       }, 60_000);
     }
 
-    // Subscribe to DMs (NIP-17) for ping/pong liveness only
-    const dmSub = client.messaging.subscribeToMessages(
+    // Subscribe to pings (plain ephemeral events, no encryption)
+    const pingSub = client.messaging.subscribeToPings(
       identity,
-      (senderPubkey: string, content: string) => {
-        try {
-          const msg = JSON.parse(content);
-          if (msg.type === "elisym_ping" && msg.nonce) {
-            const now = Date.now();
-            const lastPing = lastPingRef.current.get(senderPubkey) ?? 0;
-            if (now - lastPing < PING_COOLDOWN_MS) return;
-            lastPingRef.current.set(senderPubkey, now);
+      (senderPubkey: string, nonce: string) => {
+        const now = Date.now();
+        const lastPing = lastPingRef.current.get(senderPubkey) ?? 0;
+        if (now - lastPing < PING_COOLDOWN_MS) return;
+        lastPingRef.current.set(senderPubkey, now);
 
-            const pong = JSON.stringify({
-              type: "elisym_pong",
-              nonce: msg.nonce,
-            });
-            client.messaging
-              .sendMessage(identity, senderPubkey, pong)
-              .catch(console.error);
+        client.messaging
+          .sendPong(identity, senderPubkey, nonce)
+          .catch(console.error);
 
-            addActivity({
-              id: crypto.randomUUID(),
-              timestamp: Math.floor(Date.now() / 1000),
-              type: "dm",
-              senderPubkey,
-              preview: "ping",
-              response: "pong",
-            });
-          }
-        } catch {
-          // not JSON — ignore non-protocol messages
-        }
+        addActivity({
+          id: crypto.randomUUID(),
+          timestamp: Math.floor(Date.now() / 1000),
+          type: "dm",
+          senderPubkey,
+          preview: "ping",
+          response: "pong",
+        });
       },
     );
-    subsRef.current.push(dmSub);
+    subsRef.current.push(pingSub);
 
     setOnline(true);
     toast.success("Provider mode active");

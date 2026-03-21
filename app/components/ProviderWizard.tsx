@@ -251,7 +251,11 @@ export function ProviderWizard() {
 
       const walletAddress = publicKey?.toBase58();
 
-      for (const product of wiz.products) {
+      // Track resolved image URLs (after upload) keyed by product index
+      const resolvedImages = new Map<number, string>();
+
+      for (let i = 0; i < wiz.products.length; i++) {
+        const product = wiz.products[i]!;
         if (!product.name) continue;
 
         let imageUrl: string | undefined;
@@ -260,6 +264,8 @@ export function ProviderWizard() {
         } else if (product.photoPreview && !product.photoPreview.startsWith("data:")) {
           imageUrl = product.photoPreview;
         }
+
+        if (imageUrl) resolvedImages.set(i, imageUrl);
 
         const capabilities = product.tags.length > 0
           ? product.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-"))
@@ -279,40 +285,35 @@ export function ProviderWizard() {
         await cacheSet(`capability-result:${toDTag(product.name)}`, product.result);
       }
 
-      // localStorage backup
-      const publishedProducts = wiz.products.filter((p) => p.name);
+      // localStorage backup — use resolved (uploaded) image URLs
+      const publishedProducts = wiz.products
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }) => p.name);
       if (publishedProducts.length > 0) {
         localStorage.setItem(
           "elisym:provider-cards",
           JSON.stringify(
-            publishedProducts.map((p) => {
-              let imageUrl: string | undefined;
-              if (p.photoPreview && !p.photoPreview.startsWith("data:")) {
-                imageUrl = p.photoPreview;
-              }
-              return {
-                name: p.name, description: p.desc, price: p.price,
-                capabilities: p.tags.length > 0 ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-")) : ["general"],
-                image: imageUrl,
-                walletAddress: walletAddress,
-              };
-            }),
+            publishedProducts.map(({ p, i }) => ({
+              name: p.name, description: p.desc, price: p.price,
+              capabilities: p.tags.length > 0 ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-")) : ["general"],
+              image: resolvedImages.get(i),
+              walletAddress: walletAddress,
+            })),
           ),
         );
       }
 
-      // Optimistic cache update
+      // Optimistic cache update — use resolved (uploaded) image URLs
       const walletAddr = publicKey?.toBase58();
-      const publishedCards: { card: CapabilityCard; dTag: string }[] = wiz.products
-        .filter((p) => p.name)
-        .map((p) => {
+      const publishedCards: { card: CapabilityCard; dTag: string }[] = publishedProducts
+        .map(({ p, i }) => {
           const caps = p.tags.length > 0 ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-")) : ["general"];
           const pr = p.price ? Math.round(parseFloat(p.price.replace(",", ".")) * 1_000_000_000) : undefined;
           return {
             card: {
               name: p.name, description: p.desc, capabilities: caps,
               payment: walletAddr ? { chain: "solana" as const, network: "devnet" as const, address: walletAddr, ...(pr != null ? { job_price: pr } : {}) } : undefined,
-              image: p.photoPreview && !p.photoPreview.startsWith("data:") ? p.photoPreview : undefined,
+              image: resolvedImages.get(i),
               static: true,
             },
             dTag: toDTag(p.name),

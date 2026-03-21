@@ -154,29 +154,18 @@ function start(msg: StartMessage) {
   heartbeatInterval = setInterval(publishHeartbeat, HEARTBEAT_MS);
   log("Heartbeat started");
 
-  // --- Ping/pong ---
-  dmSub = client.messaging.subscribeToMessages(
+  // --- Ping/pong (plain ephemeral events, no encryption) ---
+  dmSub = client.messaging.subscribeToPings(
     identity,
-    (senderPubkey: string, content: string) => {
-      try {
-        const msg = JSON.parse(content);
-        if (msg.type === "elisym_ping" && msg.nonce) {
-          const now = Date.now();
-          const last = lastPings.get(senderPubkey) ?? 0;
-          if (now - last < PING_COOLDOWN_MS) return;
-          lastPings.set(senderPubkey, now);
+    (senderPubkey: string, nonce: string) => {
+      const now = Date.now();
+      const last = lastPings.get(senderPubkey) ?? 0;
+      if (now - last < PING_COOLDOWN_MS) return;
+      lastPings.set(senderPubkey, now);
 
-          client!.messaging
-            .sendMessage(
-              identity!,
-              senderPubkey,
-              JSON.stringify({ type: "elisym_pong", nonce: msg.nonce }),
-            )
-            .catch(console.error);
-        }
-      } catch {
-        // not JSON
-      }
+      client!.messaging
+        .sendPong(identity!, senderPubkey, nonce)
+        .catch(console.error);
     },
   );
   log("Ping responder active");
