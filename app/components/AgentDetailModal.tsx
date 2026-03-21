@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { formatSol, truncateKey } from "@elisym/sdk";
+import type { CapabilityCard } from "@elisym/sdk";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { nip19 } from "nostr-tools";
 import { MarbleAvatar } from "./MarbleAvatar";
+import { useBuyCapability } from "~/hooks/useBuyCapability";
 import type { AgentDisplayData } from "~/hooks/useAgentDisplay";
-import type { CapabilityCard } from "@elisym/sdk";
 
 interface AgentDetailModalProps {
   agent: AgentDisplayData;
@@ -63,7 +66,13 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
 
         <div className="flex flex-col gap-3">
           {agent.cards.map((card) => (
-            <CapabilityItem key={card.name} card={card} />
+            <CapabilityItem
+              key={card.name}
+              card={card}
+              agentPubkey={agent.pubkey}
+              agentName={agent.name}
+              agentPicture={agent.picture}
+            />
           ))}
         </div>
 
@@ -79,46 +88,115 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
   );
 }
 
-function CapabilityItem({ card }: { card: CapabilityCard }) {
+function CapabilityItem({
+  card,
+  agentPubkey,
+  agentName,
+  agentPicture,
+}: {
+  card: CapabilityCard;
+  agentPubkey: string;
+  agentName: string;
+  agentPicture?: string;
+}) {
   const price = card.payment?.job_price;
+  const isStatic = card.static === true;
+  const { publicKey } = useWallet();
+  const { buy, buying, result, error } = useBuyCapability({
+    agentPubkey,
+    agentName,
+    agentPicture,
+    card,
+  });
+  const [input, setInput] = useState("");
+
+  const hasPurchaseAction = price != null;
+
+  function handleBuy() {
+    if (isStatic) {
+      buy();
+    } else {
+      buy(input);
+    }
+  }
+
+  function buttonLabel() {
+    if (buying) return "Processing...";
+    if (!publicKey) return "Connect Wallet";
+    return price != null ? `Buy for ${formatSol(price)}` : "Submit";
+  }
 
   return (
-    <div className="p-4 bg-surface-2 rounded-xl border border-border">
-      <div className="flex items-start gap-3">
-        {card.image && (
-          <img
-            src={card.image}
-            alt={card.name}
-            className="w-16 h-16 rounded-lg object-cover shrink-0"
-          />
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="text-sm font-semibold truncate">{card.name}</div>
-            {price != null && (
-              <div className="text-sm font-bold text-green shrink-0">
-                {formatSol(price)}
-              </div>
-            )}
-          </div>
-          {card.description && (
-            <div className="text-xs text-text-2 leading-relaxed mb-2">
-              {card.description}
-            </div>
-          )}
-          {card.capabilities.length > 0 && (
-            <div className="flex gap-1.5 flex-wrap">
-              {card.capabilities.map((tag) => (
-                <span
-                  key={tag}
-                  className="py-0.5 px-2 bg-tag-bg rounded-md text-[11px] text-text-2 border border-border"
-                >
-                  {tag}
-                </span>
-              ))}
+    <div className="bg-surface-2 rounded-xl border border-border overflow-hidden">
+      {/* Large image on top */}
+      {card.image && (
+        <img
+          src={card.image}
+          alt={card.name}
+          className="w-full h-48 object-cover"
+        />
+      )}
+
+      <div className="p-4">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <div className="text-sm font-semibold truncate">{card.name}</div>
+          {price != null && (
+            <div className="text-sm font-bold text-green shrink-0">
+              {formatSol(price)}
             </div>
           )}
         </div>
+        {card.description && (
+          <div className="text-xs text-text-2 leading-relaxed mb-2">
+            {card.description}
+          </div>
+        )}
+        {card.capabilities.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap">
+            {card.capabilities.map((tag) => (
+              <span
+                key={tag}
+                className="py-0.5 px-2 bg-tag-bg rounded-md text-[11px] text-text-2 border border-border"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Purchase section */}
+        {hasPurchaseAction && (
+          <div className="mt-3">
+            {result ? (
+              <div className="p-3 bg-surface rounded-lg border border-border text-xs text-text leading-relaxed whitespace-pre-wrap">
+                {result}
+              </div>
+            ) : (
+              <>
+                {!isStatic && (
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Describe what you need..."
+                    className="w-full py-2 px-3 rounded-lg border border-border bg-surface text-text text-xs outline-none resize-y min-h-[60px] font-[inherit] mb-2 transition-colors focus:border-accent"
+                  />
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleBuy}
+                    disabled={buying || !publicKey || (!isStatic && !input.trim())}
+                    className="py-1.5 px-4 rounded-lg bg-accent text-white text-xs font-semibold border-none cursor-pointer hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {buttonLabel()}
+                  </button>
+                  {error && (
+                    <span className="text-xs text-error truncate">{error}</span>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -266,6 +266,7 @@ export function ProviderWizard() {
           capabilities,
           payment,
           image: imageUrl,
+          static: true as const,
         };
 
         await client.discovery.publishCapability(identity, card);
@@ -311,6 +312,7 @@ export function ProviderWizard() {
                 ? { chain: "solana" as const, network: "devnet" as const, address: walletAddress, ...(price != null ? { job_price: price } : {}) }
                 : undefined,
               image: p.photoPreview && !p.photoPreview.startsWith("data:") ? p.photoPreview : undefined,
+              static: true,
             },
             dTag: toDTag(p.name),
           };
