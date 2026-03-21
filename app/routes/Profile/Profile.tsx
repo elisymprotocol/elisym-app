@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { useIdentity } from "~/hooks/useIdentity";
 import { ProfileCard } from "~/components/ProfileCard";
 import { ProfileStats } from "~/components/ProfileStats";
+import { OrderHistory } from "~/components/OrderHistory";
 import { NostrKeys } from "~/components/NostrKeys";
 
 export default function Profile() {
@@ -26,6 +27,8 @@ export default function Profile() {
       <div className="bg-surface border border-border rounded-2xl p-8 mb-6">
         <ProfileStats />
       </div>
+
+      <OrderHistory />
 
       <NostrKeys />
     </div>
