@@ -189,17 +189,20 @@ export function ProviderWizard() {
     [dispatch],
   );
 
-  async function handlePublish() {
+  function getIdentity() {
+    return (
+      idCtx?.identity ??
+      ElisymIdentity.fromLocalStorage("elisym:identity") ??
+      ElisymIdentity.generate()
+    );
+  }
+
+  async function handleSaveProfile() {
     if (publishing) return;
     setPublishing(true);
-
     try {
-      const identity =
-        idCtx?.identity ??
-        ElisymIdentity.fromLocalStorage("elisym:identity") ??
-        ElisymIdentity.generate();
+      const identity = getIdentity();
 
-      // Upload avatar if present, or use existing URL
       let avatarUrl: string | undefined;
       if (wiz.avatarFile) {
         avatarUrl = await uploadToNostrBuild(wiz.avatarFile, identity);
@@ -207,32 +210,37 @@ export function ProviderWizard() {
         avatarUrl = wiz.avatarPreview;
       }
 
-      // Publish profile (kind:0) only if data changed
-      const profileChanged =
-        wiz.name !== (profile?.name ?? "") ||
-        wiz.desc !== (profile?.about ?? "") ||
-        avatarUrl !== (profile?.picture ?? undefined);
+      await client.discovery.publishProfile(identity, wiz.name, wiz.desc, avatarUrl);
 
-      if (profileChanged) {
-        await client.discovery.publishProfile(
-          identity,
-          wiz.name,
-          wiz.desc,
-          avatarUrl,
-        );
-      }
+      queryClient.setQueryData(["nostr-profile", nostrPubkey], {
+        name: wiz.name,
+        about: wiz.desc,
+        picture: avatarUrl,
+      });
 
-      // Comprehensive orphan cleanup: delete any existing d-tags not being republished
+      toast.success("Profile saved");
+      queryClient.refetchQueries({ queryKey: ["agents"] });
+    } catch (err) {
+      toast.error("Failed: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  async function handleSaveCapabilities() {
+    if (publishing) return;
+    setPublishing(true);
+    try {
+      const identity = getIdentity();
+
+      // Orphan cleanup
       const currentDTags = new Set(
         wiz.products.filter((p) => p.name).map((p) => toDTag(p.name)),
       );
       const dTagsToDelete = new Set(removedDTags);
-      // Delete existing capabilities whose d-tag won't be republished (handles renames + orphans)
       if (existingCards) {
         for (const { dTag } of existingCards) {
-          if (!currentDTags.has(dTag)) {
-            dTagsToDelete.add(dTag);
-          }
+          if (!currentDTags.has(dTag)) dTagsToDelete.add(dTag);
         }
       }
       for (const dTag of dTagsToDelete) {
@@ -241,10 +249,8 @@ export function ProviderWizard() {
       }
       setRemovedDTags([]);
 
-      // Get wallet address for payment info
       const walletAddress = publicKey?.toBase58();
 
-      // Publish each product as a separate capability (kind:31990)
       for (const product of wiz.products) {
         if (!product.name) continue;
 
@@ -264,66 +270,40 @@ export function ProviderWizard() {
           : undefined;
 
         const payment = walletAddress
-          ? {
-              chain: "solana" as const,
-              network: "devnet" as const,
-              address: walletAddress,
-              ...(price != null ? { job_price: price } : {}),
-            }
+          ? { chain: "solana" as const, network: "devnet" as const, address: walletAddress, ...(price != null ? { job_price: price } : {}) }
           : undefined;
 
-        const card = {
-          name: product.name,
-          description: product.desc,
-          capabilities,
-          payment,
-          image: imageUrl,
-          static: true as const,
-        };
-
-        await client.discovery.publishCapability(identity, card);
+        await client.discovery.publishCapability(identity, {
+          name: product.name, description: product.desc, capabilities, payment, image: imageUrl, static: true as const,
+        });
         await cacheSet(`capability-result:${toDTag(product.name)}`, product.result);
       }
 
-      // Save cards to localStorage for provider mode
+      // localStorage backup
       const publishedProducts = wiz.products.filter((p) => p.name);
       if (publishedProducts.length > 0) {
         localStorage.setItem(
           "elisym:provider-cards",
           JSON.stringify(
             publishedProducts.map((p) => ({
-              name: p.name,
-              description: p.desc,
-              price: p.price,
-              capabilities:
-                p.tags.length > 0
-                  ? p.tags.map((t) =>
-                      t.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
-                    )
-                  : ["general"],
+              name: p.name, description: p.desc, price: p.price,
+              capabilities: p.tags.length > 0 ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-")) : ["general"],
             })),
           ),
         );
       }
 
-      // Optimistically update capabilities cache with what we just published
+      // Optimistic cache update
+      const walletAddr = publicKey?.toBase58();
       const publishedCards: { card: CapabilityCard; dTag: string }[] = wiz.products
         .filter((p) => p.name)
         .map((p) => {
-          const capabilities = p.tags.length > 0
-            ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-"))
-            : ["general"];
-          const price = p.price
-            ? Math.round(parseFloat(p.price.replace(",", ".")) * 1_000_000_000)
-            : undefined;
+          const caps = p.tags.length > 0 ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-")) : ["general"];
+          const pr = p.price ? Math.round(parseFloat(p.price.replace(",", ".")) * 1_000_000_000) : undefined;
           return {
             card: {
-              name: p.name,
-              description: p.desc,
-              capabilities,
-              payment: walletAddress
-                ? { chain: "solana" as const, network: "devnet" as const, address: walletAddress, ...(price != null ? { job_price: price } : {}) }
-                : undefined,
+              name: p.name, description: p.desc, capabilities: caps,
+              payment: walletAddr ? { chain: "solana" as const, network: "devnet" as const, address: walletAddr, ...(pr != null ? { job_price: pr } : {}) } : undefined,
               image: p.photoPreview && !p.photoPreview.startsWith("data:") ? p.photoPreview : undefined,
               static: true,
             },
@@ -332,52 +312,20 @@ export function ProviderWizard() {
         });
       queryClient.setQueryData(["nostr-capabilities", nostrPubkey], publishedCards);
 
-      if (profileChanged) {
-        queryClient.setQueryData(["nostr-profile", nostrPubkey], {
-          name: wiz.name,
-          about: wiz.desc,
-          picture: avatarUrl,
-        });
-      }
-
-      toast.success("Published!");
-
-      // Refetch agents list from relays — show progress via toast
-      toast.promise(
-        queryClient.refetchQueries({ queryKey: ["agents"] }),
-        {
-          loading: "Syncing with relays...",
-          success: "Marketplace updated",
-          error: "Sync failed — will retry shortly",
-        },
-      );
-      dispatch({ type: "SET_WIZARD_STEP", step: 3 });
+      toast.success("Capabilities saved");
+      queryClient.refetchQueries({ queryKey: ["agents"] });
     } catch (err) {
-      toast.error(
-        "Failed to publish: " +
-          (err instanceof Error ? err.message : "Unknown error"),
-      );
+      toast.error("Failed: " + (err instanceof Error ? err.message : "Unknown error"));
     } finally {
       setPublishing(false);
     }
   }
 
-  function handleNext() {
-    if (step === 2) {
-      void handlePublish();
-    } else if (step < 3) {
-      dispatch({ type: "SET_WIZARD_STEP", step: step + 1 });
-    }
-  }
-
-  function handleBack() {
-    if (step > 1) {
-      // Reset products to Nostr state so uncommitted removals/edits are discarded
-      if (step === 2) {
-        populatedForPubkey.current = null;
-        setRemovedDTags([]);
-      }
-      dispatch({ type: "SET_WIZARD_STEP", step: step - 1 });
+  function handleSave() {
+    if (step === 1) {
+      void handleSaveProfile();
+    } else {
+      void handleSaveCapabilities();
     }
   }
 
@@ -419,21 +367,27 @@ export function ProviderWizard() {
           </button>
         </div>
 
-        {/* Step dots */}
-        {step < 3 && (
-          <div className="flex gap-2 mb-8">
-            {[1, 2].map((i) => (
-              <div
-                key={i}
-                className={`flex-1 h-1 rounded-sm transition-colors ${
-                  i <= step ? "bg-accent" : "bg-border"
-                }`}
-              />
-            ))}
-          </div>
-        )}
+        {/* Tabs */}
+        <div className="flex gap-1 mb-8 border-b border-border">
+          {[
+            { id: 1, label: "Profile" },
+            { id: 2, label: "Capabilities" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => dispatch({ type: "SET_WIZARD_STEP", step: tab.id })}
+              className={`py-2.5 px-5 text-sm font-medium border-b-2 transition-colors bg-transparent cursor-pointer ${
+                step === tab.id
+                  ? "border-accent text-accent"
+                  : "border-transparent text-text-2 hover:text-text"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-        {/* Step content */}
+        {/* Tab content */}
         {step === 1 && (
           <Step1
             wiz={wiz}
@@ -443,32 +397,23 @@ export function ProviderWizard() {
           />
         )}
         {step === 2 && <Step2 wiz={wiz} updateData={updateData} onTrackRemoval={(name) => setRemovedDTags((prev) => [...prev, name])} />}
-        {step === 3 && (
-          <StepSuccess onClose={() => dispatch({ type: "CLOSE_WIZARD" })} />
-        )}
 
-        {/* Nav */}
-        {step < 3 && (
-          <div className="flex justify-between items-center mt-8 pt-5 border-t border-border">
-            {step > 1 ? (
-              <button
-                onClick={handleBack}
-                className="py-3 px-7 rounded-[10px] border border-border bg-transparent text-text-2 text-sm font-semibold cursor-pointer hover:border-text-2 hover:text-text"
-              >
-                Back
-              </button>
-            ) : (
-              <div />
-            )}
-            <button
-              onClick={handleNext}
-              disabled={publishing}
-              className="py-3 px-7 rounded-[10px] border-none bg-accent text-white text-sm font-semibold cursor-pointer hover:bg-accent-hover disabled:opacity-50"
-            >
-              {publishing ? "Publishing..." : step === 2 ? "Publish" : "Continue"}
-            </button>
-          </div>
-        )}
+        {/* Footer */}
+        <div className="flex justify-end items-center gap-3 mt-8 pt-5 border-t border-border">
+          <button
+            onClick={() => dispatch({ type: "CLOSE_WIZARD" })}
+            className="py-3 px-7 rounded-[10px] border border-border bg-transparent text-text-2 text-sm font-semibold cursor-pointer hover:border-text-2 hover:text-text"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={publishing}
+            className="py-3 px-7 rounded-[10px] border-none bg-accent text-white text-sm font-semibold cursor-pointer hover:bg-accent-hover disabled:opacity-50"
+          >
+            {publishing ? "Saving..." : "Save"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -491,7 +436,6 @@ function Step1({
 }) {
   return (
     <>
-      <div className="text-xs text-text-2 mb-1.5">Step 1 of 2</div>
       <div className="text-lg font-semibold mb-6">About you</div>
 
       <div className="mb-5">
@@ -618,7 +562,6 @@ function Step2({
 
   return (
     <>
-      <div className="text-xs text-text-2 mb-1.5">Step 2 of 2</div>
       <div className="text-lg font-semibold mb-6">Your products</div>
 
       {wiz.products.map((p, i) => (
@@ -793,20 +736,3 @@ function ProductCard({
   );
 }
 
-function StepSuccess({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="text-center py-5">
-      <div className="w-[72px] h-[72px] rounded-full bg-green/15 flex items-center justify-center mx-auto mb-5 text-[32px]">
-        &#10003;
-      </div>
-      <h3 className="text-xl mb-2">You're all set!</h3>
-      <p className="text-text-2 text-sm leading-relaxed">
-        Your provider profile has been published to the Nostr network. Customers
-        can now discover and hire you on the elisym marketplace.
-      </p>
-      <button onClick={onClose} className="btn btn-primary mt-6">
-        Go to Marketplace
-      </button>
-    </div>
-  );
-}
