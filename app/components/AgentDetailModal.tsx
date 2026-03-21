@@ -5,6 +5,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { nip19 } from "nostr-tools";
 import { MarbleAvatar } from "./MarbleAvatar";
 import { useBuyCapability } from "~/hooks/useBuyCapability";
+import { useOptionalIdentity } from "~/hooks/useIdentity";
 import type { AgentDisplayData } from "~/hooks/useAgentDisplay";
 
 interface AgentDetailModalProps {
@@ -79,7 +80,10 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
         {/* Footer info */}
         <div className="flex items-center justify-between mt-6 pt-5 border-t border-border text-xs text-text-2">
           {agent.walletAddress && (
-            <span className="font-mono">{truncateKey(agent.walletAddress)}</span>
+            <span className="font-mono">
+              <span className="text-text-2 font-sans font-medium mr-1.5">Wallet</span>
+              {truncateKey(agent.walletAddress)}
+            </span>
           )}
           <span>{agent.lastSeen}</span>
         </div>
@@ -102,6 +106,8 @@ function CapabilityItem({
   const price = card.payment?.job_price;
   const isStatic = card.static === true;
   const { publicKey } = useWallet();
+  const idCtx = useOptionalIdentity();
+  const isOwn = idCtx?.publicKey === agentPubkey;
   const { buy, buying, result, error } = useBuyCapability({
     agentPubkey,
     agentName,
@@ -165,7 +171,7 @@ function CapabilityItem({
         )}
 
         {/* Purchase section */}
-        {hasPurchaseAction && (
+        {hasPurchaseAction && !isOwn && (
           <div className="mt-3">
             {result ? (
               <div className="p-3 bg-surface rounded-lg border border-border text-xs text-text leading-relaxed whitespace-pre-wrap">

@@ -1,5 +1,5 @@
 import { useStats } from "~/hooks/useStats";
-import { formatSol } from "@elisym/sdk";
+import Decimal from "decimal.js-light";
 
 export function StatsBar() {
   const { data } = useStats();
@@ -48,13 +48,15 @@ export function StatsBar() {
         <div className="flex-1 flex items-center gap-3.5 py-5 px-6 border-l border-border max-sm:border-l-0 max-sm:border-t">
           <div className="size-10 rounded-full flex items-center justify-center shrink-0 bg-stat-indigo-bg text-stat-indigo">
             <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 6v6l4 2" />
+              <path d="M6 3h12l3 6-9 12L3 9z" />
+              <path d="M3 9h18" />
+              <path d="M9 3l-1.5 6L12 21" />
+              <path d="M15 3l1.5 6L12 21" />
             </svg>
           </div>
           <div>
             <div className="text-2xl font-bold leading-tight">
-              {data ? formatSol(data.totalLamports) : "—"}
+              {data ? `${new Decimal(data.totalLamports).div(1e9).toFixed(2)} SOL` : "—"}
             </div>
             <div className="text-xs text-text-2 mt-0.5">
               Volume · Paid via Solana

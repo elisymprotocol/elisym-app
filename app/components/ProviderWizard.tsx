@@ -410,7 +410,7 @@ export function ProviderWizard() {
       <div className="bg-surface border border-border rounded-[18px] w-[560px] max-w-[95vw] max-h-[90vh] overflow-y-auto p-8">
         {/* Top */}
         <div className="flex items-center justify-between mb-7">
-          <h2 className="text-xl font-bold">Start Selling</h2>
+          <h2 className="text-xl font-bold">Manage Profile</h2>
           <button
             onClick={() => dispatch({ type: "CLOSE_WIZARD" })}
             className="bg-transparent border-none text-text-2 text-[22px] cursor-pointer hover:text-text"

@@ -18,7 +18,7 @@ export function FilterBar() {
   return (
     <div className="flex items-center justify-between mb-7 gap-4 flex-wrap">
       <h2 className="text-xl font-bold whitespace-nowrap">
-        Available Services
+        Available Providers
       </h2>
       <div className="flex gap-2 flex-wrap">
         {FILTERS.map((f) => (

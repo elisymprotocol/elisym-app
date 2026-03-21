@@ -17,7 +17,7 @@ export function HeroSection() {
           onClick={() => dispatch({ type: "OPEN_WIZARD" })}
           className="btn btn-primary mt-6 py-3.5 px-8 text-sm"
         >
-          Start Selling
+          Manage Profile
         </button>
       </section>
     </div>
