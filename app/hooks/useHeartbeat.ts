@@ -2,8 +2,9 @@ import { useEffect, useRef } from "react";
 import { useElisymClient } from "./useElisymClient";
 import { useOptionalIdentity } from "./useIdentity";
 import { useLocalQuery } from "./useLocalQuery";
-import type { CapabilityCard } from "@elisym/sdk";
-import type { Filter } from "nostr-tools";
+import { cacheGet } from "~/lib/localCache";
+import { PaymentService, toDTag, type CapabilityCard } from "@elisym/sdk";
+import type { Filter, Event } from "nostr-tools";
 
 type SubCloser = { close: (reason?: string) => void };
 
@@ -11,9 +12,10 @@ const HEARTBEAT_MS = 60_000;
 const PING_COOLDOWN_MS = 1000;
 
 /**
- * Automatically republishes the most recent capability every 60s
- * to keep the agent fresh in marketplace listings.
- * Reacts to identity changes — stops old heartbeat, starts new one.
+ * Heartbeat + ping/pong + job handler.
+ * - Republishes last capability every 60s to stay fresh
+ * - Responds to ping DMs with pong
+ * - Listens for job requests, requests payment, delivers static result
  */
 export function useHeartbeat() {
   const { client } = useElisymClient();
@@ -52,7 +54,10 @@ export function useHeartbeat() {
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dmSubRef = useRef<SubCloser | null>(null);
+  const jobSubRef = useRef<SubCloser | null>(null);
+  const paymentSubsRef = useRef<SubCloser[]>([]);
   const lastPingRef = useRef<Map<string, number>>(new Map());
+  const processedJobsRef = useRef<Set<string>>(new Set());
 
   // Heartbeat: republish last capability every 60s
   useEffect(() => {
@@ -84,7 +89,7 @@ export function useHeartbeat() {
     };
   }, [identity, capabilities, client]);
 
-  // Ping/pong responder: reply to elisym_ping DMs
+  // Ping/pong responder
   useEffect(() => {
     if (dmSubRef.current) {
       dmSubRef.current.close();
@@ -126,4 +131,102 @@ export function useHeartbeat() {
       }
     };
   }, [identity, client]);
+
+  // Job request handler: listen for kind:5100, request payment, deliver result
+  useEffect(() => {
+    if (jobSubRef.current) {
+      jobSubRef.current.close();
+      jobSubRef.current = null;
+    }
+    for (const sub of paymentSubsRef.current) sub.close();
+    paymentSubsRef.current = [];
+    processedJobsRef.current.clear();
+
+    if (!identity || !capabilities || capabilities.length === 0) return;
+
+    // Build capability lookup: tag → { card, dTag }
+    const capByTag = new Map<string, { card: CapabilityCard; dTag: string }>();
+    for (const cap of capabilities) {
+      for (const tag of cap.card.capabilities) {
+        capByTag.set(tag, cap);
+      }
+      // Also match by d-tag (capability name slug)
+      capByTag.set(cap.dTag, cap);
+    }
+
+    const handleJobRequest = async (event: Event) => {
+      // Dedup
+      if (processedJobsRef.current.has(event.id)) return;
+      processedJobsRef.current.add(event.id);
+
+      // Find matching capability
+      const requestedTag = event.tags.find((t) => t[0] === "t" && t[1] !== "elisym")?.[1];
+      const matchedCap = requestedTag ? capByTag.get(requestedTag) : capabilities[0];
+      if (!matchedCap) return;
+
+      const price = matchedCap.card.payment?.job_price ?? 0;
+      const walletAddress = matchedCap.card.payment?.address;
+
+      if (price > 0 && walletAddress) {
+        // Request payment
+        const paymentRequest = PaymentService.createPaymentRequest(walletAddress, price);
+        const paymentRequestJson = JSON.stringify(paymentRequest);
+
+        await client.marketplace.submitPaymentRequiredFeedback(
+          identity,
+          event,
+          price,
+          paymentRequestJson,
+        );
+
+        // Listen for payment confirmation
+        const paymentSub = client.pool.subscribe(
+          {
+            kinds: [7000],
+            "#e": [event.id],
+            since: Math.floor(Date.now() / 1000) - 5,
+          } as Filter,
+          async (feedbackEv) => {
+            const statusTag = feedbackEv.tags.find((t) => t[0] === "status");
+            if (statusTag?.[1] !== "payment-completed") return;
+
+            // Payment received — deliver result
+            await deliverResult(event, matchedCap.dTag, price);
+            paymentSub.close();
+          },
+        );
+        paymentSubsRef.current.push(paymentSub);
+      } else {
+        // Free capability — deliver immediately
+        await deliverResult(event, matchedCap.dTag, 0);
+      }
+    };
+
+    const deliverResult = async (requestEvent: Event, dTag: string, amount: number) => {
+      const result = await cacheGet<string>(`capability-result:${dTag}`);
+      const content = result || "No delivery content configured.";
+
+      await client.marketplace.submitJobResult(
+        identity!,
+        requestEvent,
+        content,
+        amount > 0 ? amount : undefined,
+      );
+    };
+
+    jobSubRef.current = client.marketplace.subscribeToJobRequests(
+      identity,
+      [5100],
+      (event) => void handleJobRequest(event),
+    );
+
+    return () => {
+      if (jobSubRef.current) {
+        jobSubRef.current.close();
+        jobSubRef.current = null;
+      }
+      for (const sub of paymentSubsRef.current) sub.close();
+      paymentSubsRef.current = [];
+    };
+  }, [identity, capabilities, client]);
 }
