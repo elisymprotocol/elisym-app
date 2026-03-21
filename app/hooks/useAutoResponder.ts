@@ -20,6 +20,8 @@ export interface ProviderCard {
   description: string;
   price: string;
   capabilities: string[];
+  image?: string;
+  walletAddress?: string;
 }
 
 const STORAGE_KEY = "elisym:provider-cards";
@@ -62,26 +64,53 @@ export function useAutoResponder() {
     const cards = loadProviderCards();
     if (cards.length === 0) return;
 
-    // Publish capabilities
-    for (const card of cards) {
-      await client.discovery.publishCapability(identity, {
-        name: card.name,
-        description: card.description,
-        capabilities: card.capabilities,
-      });
+    // Publish capabilities (best-effort — DM subscription below is what matters for ping)
+    const publishableCards = cards.filter((card) => card.walletAddress);
+    for (const card of publishableCards) {
+      try {
+        const price = card.price
+          ? Math.round(parseFloat(card.price.replace(",", ".")) * 1_000_000_000)
+          : undefined;
+        await client.discovery.publishCapability(identity, {
+          name: card.name,
+          description: card.description,
+          capabilities: card.capabilities,
+          image: card.image,
+          payment: {
+            chain: "solana",
+            network: "devnet",
+            address: card.walletAddress!,
+            ...(price != null ? { job_price: price } : {}),
+          },
+        });
+      } catch (err) {
+        console.error("Failed to publish capability:", card.name, err);
+      }
     }
 
-    // Heartbeat: republish last capability every 60s to stay fresh in listings
-    const lastCard = cards[cards.length - 1]!;
-    heartbeatRef.current = setInterval(() => {
-      client.discovery
-        .publishCapability(identity, {
-          name: lastCard.name,
-          description: lastCard.description,
-          capabilities: lastCard.capabilities,
-        })
-        .catch(console.error);
-    }, 60_000);
+    // Heartbeat: republish last publishable capability every 60s to stay fresh in listings
+    const lastCard = publishableCards[publishableCards.length - 1];
+    if (lastCard) {
+      heartbeatRef.current = setInterval(() => {
+        const price = lastCard.price
+          ? Math.round(parseFloat(lastCard.price.replace(",", ".")) * 1_000_000_000)
+          : undefined;
+        client.discovery
+          .publishCapability(identity, {
+            name: lastCard.name,
+            description: lastCard.description,
+            capabilities: lastCard.capabilities,
+            image: lastCard.image,
+            payment: {
+              chain: "solana",
+              network: "devnet",
+              address: lastCard.walletAddress!,
+              ...(price != null ? { job_price: price } : {}),
+            },
+          })
+          .catch(console.error);
+      }, 60_000);
+    }
 
     // Subscribe to DMs (NIP-17) for ping/pong liveness only
     const dmSub = client.messaging.subscribeToMessages(

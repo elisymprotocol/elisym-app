@@ -285,10 +285,18 @@ export function ProviderWizard() {
         localStorage.setItem(
           "elisym:provider-cards",
           JSON.stringify(
-            publishedProducts.map((p) => ({
-              name: p.name, description: p.desc, price: p.price,
-              capabilities: p.tags.length > 0 ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-")) : ["general"],
-            })),
+            publishedProducts.map((p) => {
+              let imageUrl: string | undefined;
+              if (p.photoPreview && !p.photoPreview.startsWith("data:")) {
+                imageUrl = p.photoPreview;
+              }
+              return {
+                name: p.name, description: p.desc, price: p.price,
+                capabilities: p.tags.length > 0 ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-")) : ["general"],
+                image: imageUrl,
+                walletAddress: walletAddress,
+              };
+            }),
           ),
         );
       }
