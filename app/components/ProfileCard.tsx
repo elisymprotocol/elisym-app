@@ -116,7 +116,7 @@ export function ProfileCard({ npub, pubkey, keyName }: ProfileCardProps) {
   const showImg = imgSrc && imgLoaded;
 
   return (
-    <div className="bg-surface border border-border rounded-2xl p-8 mb-6">
+    <div className="bg-surface border border-border rounded-2xl p-8">
       <div className="flex items-center gap-5 max-sm:flex-col max-sm:text-center relative">
         <div className="w-20 h-20 rounded-full overflow-hidden shrink-0 flex items-center justify-center">
           {isLoading ? (

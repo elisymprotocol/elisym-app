@@ -220,6 +220,7 @@ export function ProviderWizard() {
 
       toast.success("Profile saved");
       queryClient.refetchQueries({ queryKey: ["agents"] });
+      dispatch({ type: "CLOSE_WIZARD" });
     } catch (err) {
       toast.error("Failed: " + (err instanceof Error ? err.message : "Unknown error"));
     } finally {
@@ -323,6 +324,7 @@ export function ProviderWizard() {
 
       toast.success("Capabilities saved");
       queryClient.refetchQueries({ queryKey: ["agents"] });
+      dispatch({ type: "CLOSE_WIZARD" });
     } catch (err) {
       toast.error("Failed: " + (err instanceof Error ? err.message : "Unknown error"));
     } finally {

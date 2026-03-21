@@ -4,7 +4,6 @@ import { useAgentDisplay } from "~/hooks/useAgentDisplay";
 import { useStats } from "~/hooks/useStats";
 import { useUI } from "~/contexts/UIContext";
 import { HeroSection } from "~/components/HeroSection";
-import { StatsBar } from "~/components/StatsBar";
 import { FilterBar, KNOWN_CATEGORIES } from "~/components/FilterBar";
 import { AgentCard } from "~/components/AgentCard";
 import { toast } from "sonner";
@@ -14,6 +13,20 @@ const RELAYS = [
   "wss://nos.lol",
   "wss://relay.nostr.band",
 ];
+
+/** Build page numbers with ellipsis: [1, '...', 4, 5, 6, '...', 20] */
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "...")[] = [];
+  pages.push(1);
+  if (current > 3) pages.push("...");
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+    pages.push(i);
+  }
+  if (current < total - 2) pages.push("...");
+  pages.push(total);
+  return pages;
+}
 
 interface LogLine {
   text: string;
@@ -221,7 +234,6 @@ export default function Home() {
   return (
     <>
       <HeroSection />
-      <StatsBar />
 
       <div className="max-w-6xl mx-auto py-8 px-6">
         <FilterBar />
@@ -232,41 +244,31 @@ export default function Home() {
           </p>
         ) : (
           <>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-5">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] gap-5">
               {paged.map((agent) => (
                 <AgentCard key={agent.pubkey} agent={agent} />
               ))}
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-8">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={safePage <= 1}
-                  className="py-2 px-4 rounded-lg border border-border bg-surface text-sm font-medium text-text-2 hover:border-accent hover:text-text disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                >
-                  Prev
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPage(p)}
-                    className={`size-9 rounded-lg border text-sm font-medium transition-colors ${
-                      p === safePage
-                        ? "bg-accent border-accent text-white"
-                        : "bg-surface border-border text-text-2 hover:border-accent hover:text-text"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={safePage >= totalPages}
-                  className="py-2 px-4 rounded-lg border border-border bg-surface text-sm font-medium text-text-2 hover:border-accent hover:text-text disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                >
-                  Next
-                </button>
+              <div className="flex items-center justify-center gap-1.5 mt-8">
+                {getPageNumbers(safePage, totalPages).map((p, i) =>
+                  p === "..." ? (
+                    <span key={`dot-${i}`} className="size-9 flex items-center justify-center text-sm text-text-2">...</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p as number)}
+                      className={`size-9 rounded-lg border text-sm font-medium transition-colors ${
+                        p === safePage
+                          ? "bg-accent border-accent text-white"
+                          : "bg-surface border-border text-text-2 hover:border-accent hover:text-text"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
               </div>
             )}
           </>

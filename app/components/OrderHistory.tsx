@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Decimal from "decimal.js-light";
 import { truncateKey, timeAgo } from "@elisym/sdk";
+import * as nip44 from "nostr-tools/nip44";
 import { useElisymClient } from "~/hooks/useElisymClient";
 import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
@@ -37,26 +38,61 @@ export function OrderHistory() {
 
       const requestIds = requests.map((r) => r.id);
 
-      // Fetch results for these requests
-      const results = await client.pool.queryBatchedByTag(
-        { kinds: [6100] } as Filter,
+      // Fetch feedback (kind:7000) to find which jobs were paid
+      const feedbacks = await client.pool.queryBatchedByTag(
+        { kinds: [7000] } as Filter,
         "e",
         requestIds,
       );
 
-      // Index results by request ID
+      // Collect request IDs that have payment-completed feedback
+      const paidRequestIds = new Set<string>();
+      for (const fb of feedbacks) {
+        const statusTag = fb.tags.find((t) => t[0] === "status");
+        if (statusTag?.[1] !== "payment-completed") continue;
+        const eTag = fb.tags.find((t) => t[0] === "e");
+        if (eTag?.[1]) paidRequestIds.add(eTag[1]);
+      }
+
+      // Only keep paid requests
+      const paidRequests = requests.filter((r) => paidRequestIds.has(r.id));
+      if (paidRequests.length === 0) return [];
+
+      const paidIds = paidRequests.map((r) => r.id);
+
+      // Fetch results for paid requests
+      const results = await client.pool.queryBatchedByTag(
+        { kinds: [6100] } as Filter,
+        "e",
+        paidIds,
+      );
+
+      // Index results by request ID, decrypting NIP-44 if needed
+      const sk = idCtx?.identity?.secretKey;
       const resultByRequest = new Map<string, { content: string; amount?: number }>();
       for (const r of results) {
         const eTag = r.tags.find((t) => t[0] === "e");
         if (!eTag?.[1]) continue;
         const amtTag = r.tags.find((t) => t[0] === "amount");
+        const isEncrypted = r.tags.some((t) => t[0] === "encrypted" && t[1] === "nip44");
+
+        let content = r.content;
+        if (isEncrypted && sk) {
+          try {
+            const conversationKey = nip44.v2.utils.getConversationKey(sk, r.pubkey);
+            content = nip44.v2.decrypt(content, conversationKey);
+          } catch {
+            // fallback to raw content
+          }
+        }
+
         resultByRequest.set(eTag[1], {
-          content: r.content,
+          content,
           amount: amtTag?.[1] ? parseInt(amtTag[1], 10) : undefined,
         });
       }
 
-      return requests
+      return paidRequests
         .sort((a, b) => b.created_at - a.created_at)
         .map((req) => {
           const capTag = req.tags.find((t) => t[0] === "t" && t[1] !== "elisym");
@@ -90,9 +126,36 @@ export function OrderHistory() {
 
   if (!orders || orders.length === 0) {
     return (
-      <div className="bg-surface border border-border rounded-2xl p-8 mb-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-surface border border-border rounded-2xl p-8">
+        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <h3 className="text-base font-semibold">Order History</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-text-2 max-sm:hidden">Updates every 60s</span>
+            <button
+              onClick={handleResync}
+              disabled={syncing}
+              className="inline-flex items-center gap-1.5 py-1 px-3 rounded-lg border border-border bg-surface text-[11px] font-medium text-text-2 cursor-pointer hover:border-accent hover:text-text disabled:opacity-50 transition-colors"
+            >
+              {syncing ? (
+                <>
+                  <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity="0.3" />
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M1 4v6h6" />
+                    <path d="M23 20v-6h-6" />
+                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+                  </svg>
+                  Resync
+                </>
+              )}
+            </button>
+          </div>
         </div>
         <p className="text-sm text-text-2 text-center py-4">No orders yet.</p>
       </div>
@@ -100,7 +163,7 @@ export function OrderHistory() {
   }
 
   return (
-    <div className="bg-surface border border-border rounded-2xl p-8 mb-6">
+    <div className="bg-surface border border-border rounded-2xl p-8">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-semibold">Order History</h3>
         <div className="flex items-center gap-2">

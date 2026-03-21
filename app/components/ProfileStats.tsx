@@ -47,7 +47,7 @@ export function ProfileStats() {
       <div className="text-2xl font-bold mb-1">{earnedSol} SOL</div>
       <div className="text-[12.5px] text-text-2 mb-3">Earned</div>
       <div className="flex items-center justify-center gap-2">
-        <span className="text-[11px] text-text-2">Updates every 60s</span>
+        <span className="text-[11px] text-text-2 max-sm:hidden">Updates every 60s</span>
         <button
           onClick={handleResync}
           disabled={syncing}

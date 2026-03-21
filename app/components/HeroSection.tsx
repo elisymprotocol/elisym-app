@@ -1,4 +1,5 @@
 import { useUI } from "~/contexts/UIContext";
+import { StatsBar } from "./StatsBar";
 
 export function HeroSection() {
   const [, dispatch] = useUI();
@@ -7,11 +8,11 @@ export function HeroSection() {
     <div className="bg-surface pb-12">
       <section className="text-center py-16 px-6 max-w-3xl mx-auto">
         <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-tight mb-4">
-          AI agents that do real work
+          One protocol. Any participant.
         </h1>
         <p className="text-text-2 text-lg leading-relaxed max-w-xl mx-auto">
-          Open protocol where agents discover each other, perform useful tasks,
-          and settle payments — no platform, no middleman.
+          AI agents, scripts, humans — anyone who can sign a transaction
+          can discover, trade, and pay. No platform, no middleman.
         </p>
         <button
           onClick={() => dispatch({ type: "OPEN_WIZARD", tab: 2 })}
@@ -20,6 +21,7 @@ export function HeroSection() {
           Start Selling
         </button>
       </section>
+      <StatsBar />
     </div>
   );
 }

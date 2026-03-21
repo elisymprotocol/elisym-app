@@ -7,7 +7,7 @@ export function Header() {
   const { publicKey, select, wallets } = useWallet();
 
   const address = publicKey?.toBase58();
-  const display = address ? truncateKey(address) : null;
+  const display = address ? truncateKey(address, 4) : null;
 
   function handleSignIn() {
     if (wallets.length > 0 && wallets[0]) {

@@ -51,7 +51,7 @@ function toDisplayData(agent: Agent): AgentDisplayData {
     category: allTags[0] || "other",
     price: price != null ? formatSol(price) : "N/A",
     priceLamports: price,
-    wallet: walletAddress ? truncateKey(walletAddress) : "",
+    wallet: walletAddress ? truncateKey(walletAddress, 4) : "",
     walletAddress,
     lastSeen: timeAgo(agent.lastSeen),
     picture: agent.picture,
