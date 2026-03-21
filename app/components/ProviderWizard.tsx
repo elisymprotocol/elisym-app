@@ -8,6 +8,7 @@ import { useUI } from "~/contexts/UIContext";
 import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
 import { uploadToNostrBuild } from "~/lib/uploadImage";
+import { cacheGet, cacheSet, cacheDel } from "~/lib/localCache";
 import type { Filter } from "nostr-tools";
 
 interface NostrProfile {
@@ -25,6 +26,8 @@ interface WizProduct {
   photoPreview: string | null;
   /** Original d-tag from Nostr — used to detect renames and deletions. */
   originalDTag?: string;
+  /** Static result text returned to the buyer after payment. */
+  result: string;
 }
 
 function getWizData(data: Record<string, unknown>) {
@@ -34,7 +37,7 @@ function getWizData(data: Record<string, unknown>) {
     avatarFile: (data.avatarFile as File | null) ?? null,
     avatarPreview: (data.avatarPreview as string | null) ?? null,
     products: (data.products as WizProduct[]) || [
-      { name: "", desc: "", price: "", tags: [], photoFile: null, photoPreview: null },
+      { name: "", desc: "", price: "", tags: [], photoFile: null, photoPreview: null, result: "" },
     ],
   };
 }
@@ -120,55 +123,63 @@ export function ProviderWizard() {
   // Wait for both queries to resolve (undefined = loading, null/[] = resolved with no data)
   useEffect(() => {
     if (!state.wizardOpen || profile === undefined || existingCards === undefined) return;
-    const identityChanged = populatedForPubkey.current !== nostrPubkey;
-    const patch: Record<string, unknown> = {};
 
-    if (identityChanged) {
-      // Reset fields first so stale data from previous identity doesn't linger
-      patch.name = "";
-      patch.desc = "";
-      patch.avatarPreview = null;
-      patch.avatarFile = null;
-      patch.products = [{ name: "", desc: "", price: "", tags: [], photoFile: null, photoPreview: null }];
-      setRemovedDTags([]);
-    }
+    void (async () => {
+      const identityChanged = populatedForPubkey.current !== nostrPubkey;
+      const patch: Record<string, unknown> = {};
 
-    if (profile) {
-      if ((identityChanged || !wiz.name) && profile.name) patch.name = profile.name;
-      if ((identityChanged || !wiz.desc) && profile.about) patch.desc = profile.about;
-      if ((identityChanged || !wiz.avatarPreview) && profile.picture) {
-        patch.avatarPreview = profile.picture;
+      if (identityChanged) {
+        // Reset fields first so stale data from previous identity doesn't linger
+        patch.name = "";
+        patch.desc = "";
+        patch.avatarPreview = null;
         patch.avatarFile = null;
+        patch.products = [{ name: "", desc: "", price: "", tags: [], photoFile: null, photoPreview: null, result: "" }];
+        setRemovedDTags([]);
       }
-    }
 
-    if (existingCards && existingCards.length > 0) {
-      const hasProducts = wiz.products.some((p) => p.name);
-      if (identityChanged || !hasProducts) {
-        patch.products = existingCards.map(({ card, dTag }) => {
-          const price = card.payment?.job_price
-            ? (card.payment.job_price / 1_000_000_000).toString()
-            : "";
-          const tags = CATEGORIES.filter((cat) =>
-            card.capabilities.includes(cat.toLowerCase().replace(/[^a-z0-9-]/g, "-")),
+      if (profile) {
+        if ((identityChanged || !wiz.name) && profile.name) patch.name = profile.name;
+        if ((identityChanged || !wiz.desc) && profile.about) patch.desc = profile.about;
+        if ((identityChanged || !wiz.avatarPreview) && profile.picture) {
+          patch.avatarPreview = profile.picture;
+          patch.avatarFile = null;
+        }
+      }
+
+      if (existingCards && existingCards.length > 0) {
+        const hasProducts = wiz.products.some((p) => p.name);
+        if (identityChanged || !hasProducts) {
+          const products = await Promise.all(
+            existingCards.map(async ({ card, dTag }) => {
+              const price = card.payment?.job_price
+                ? (card.payment.job_price / 1_000_000_000).toString()
+                : "";
+              const tags = CATEGORIES.filter((cat) =>
+                card.capabilities.includes(cat.toLowerCase().replace(/[^a-z0-9-]/g, "-")),
+              );
+              const result = (await cacheGet<string>(`capability-result:${dTag}`)) ?? "";
+              return {
+                name: card.name,
+                desc: card.description,
+                price,
+                tags,
+                photoFile: null,
+                photoPreview: card.image ?? null,
+                originalDTag: dTag,
+                result,
+              } satisfies WizProduct;
+            }),
           );
-          return {
-            name: card.name,
-            desc: card.description,
-            price,
-            tags,
-            photoFile: null,
-            photoPreview: card.image ?? null,
-            originalDTag: dTag,
-          } satisfies WizProduct;
-        });
+          patch.products = products;
+        }
       }
-    }
 
-    if (Object.keys(patch).length > 0) {
-      dispatch({ type: "UPDATE_WIZARD_DATA", data: patch });
-    }
-    populatedForPubkey.current = nostrPubkey;
+      if (Object.keys(patch).length > 0) {
+        dispatch({ type: "UPDATE_WIZARD_DATA", data: patch });
+      }
+      populatedForPubkey.current = nostrPubkey;
+    })();
   }, [state.wizardOpen, profile, existingCards, nostrPubkey]);
 
   const updateData = useCallback(
@@ -226,6 +237,7 @@ export function ProviderWizard() {
       }
       for (const dTag of dTagsToDelete) {
         await client.discovery.deleteCapability(identity, dTag);
+        await cacheDel(`capability-result:${dTag}`);
       }
       setRemovedDTags([]);
 
@@ -270,6 +282,7 @@ export function ProviderWizard() {
         };
 
         await client.discovery.publishCapability(identity, card);
+        await cacheSet(`capability-result:${toDTag(product.name)}`, product.result);
       }
 
       // Save cards to localStorage for provider mode
@@ -577,7 +590,7 @@ function Step2({
     updateData({
       products: [
         ...wiz.products,
-        { name: "", desc: "", price: "", tags: [], photoFile: null, photoPreview: null },
+        { name: "", desc: "", price: "", tags: [], photoFile: null, photoPreview: null, result: "" },
       ],
     });
   }
@@ -723,6 +736,18 @@ function ProductCard({
           placeholder="What's included?"
           value={product.desc}
           onChange={(e) => onUpdate(index, { desc: e.target.value })}
+        />
+      </div>
+
+      <div className="mb-3">
+        <label className="block text-[13px] font-medium text-text-2 mb-2">
+          Delivery
+        </label>
+        <textarea
+          className="w-full py-3 px-3.5 rounded-[10px] border border-border bg-surface text-text text-sm outline-none resize-y min-h-[50px] font-[inherit] focus:border-accent"
+          placeholder="Content delivered to the buyer after payment"
+          value={product.result}
+          onChange={(e) => onUpdate(index, { result: e.target.value })}
         />
       </div>
 
