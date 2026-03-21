@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useIdentity, type StoredIdentity } from "~/hooks/useIdentity";
-import { useElisymClient } from "@elisym/sdk/react";
+import { useElisymClient } from "~/hooks/useElisymClient";
 import { getPublicKey, nip19 } from "nostr-tools";
 import { toast } from "sonner";
 import type { Filter } from "nostr-tools";

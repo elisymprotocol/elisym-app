@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { useElisymClient } from "@elisym/sdk/react";
+import { useElisymClient } from "./useElisymClient";
 import { ElisymIdentity } from "@elisym/sdk";
 import { toast } from "sonner";
 import { useOptionalIdentity } from "./useIdentity";
@@ -95,11 +95,10 @@ export function useAutoResponder() {
     );
     subsRef.current.push(jobSub);
 
-    // Subscribe to DMs (NIP-17)
+    // Subscribe to DMs (NIP-17) for ping/pong liveness only
     const dmSub = client.messaging.subscribeToMessages(
       identity,
-      (senderPubkey: string, content: string, _createdAt: number, _rumorId: string) => {
-        // Handle ping → pong
+      (senderPubkey: string, content: string) => {
         try {
           const msg = JSON.parse(content);
           if (msg.type === "elisym_ping" && msg.nonce) {
@@ -124,25 +123,10 @@ export function useAutoResponder() {
               preview: "ping",
               response: "pong",
             });
-            return;
           }
         } catch {
-          // not JSON, treat as regular message
+          // not JSON — ignore non-protocol messages
         }
-
-        // Auto-reply "hello" to regular messages
-        client.messaging
-          .sendMessage(identity, senderPubkey, "hello")
-          .catch(console.error);
-
-        addActivity({
-          id: crypto.randomUUID(),
-          timestamp: Math.floor(Date.now() / 1000),
-          type: "dm",
-          senderPubkey,
-          preview: content.slice(0, 80),
-          response: "hello",
-        });
       },
     );
     subsRef.current.push(dmSub);

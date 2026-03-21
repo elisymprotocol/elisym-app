@@ -26,14 +26,9 @@ export function Header() {
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
-  async function handleSignIn() {
-    try {
-      if (wallets.length > 0 && wallets[0]) {
-        select(wallets[0].adapter.name);
-      }
-      await connect();
-    } catch (_err) {
-      toast.error("Failed to connect wallet");
+  function handleSignIn() {
+    if (wallets.length > 0 && wallets[0]) {
+      select(wallets[0].adapter.name);
     }
   }
 

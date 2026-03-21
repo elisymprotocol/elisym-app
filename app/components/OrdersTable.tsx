@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { MarbleAvatar } from "./MarbleAvatar";
-import type { StoredJob } from "@elisym/sdk";
+import type { StoredJob } from "~/hooks/useJobHistory";
 
 interface OrdersTableProps {
   jobs: StoredJob[];

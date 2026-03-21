@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { truncateKey } from "@elisym/sdk";
-import { useElisymClient } from "@elisym/sdk/react";
+import { useElisymClient } from "~/hooks/useElisymClient";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
 import { getCachedImage, cacheImage } from "~/lib/localCache";
 import { MarbleAvatar } from "./MarbleAvatar";

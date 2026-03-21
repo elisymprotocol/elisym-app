@@ -1,4 +1,4 @@
-import type { StoredJob } from "@elisym/sdk";
+import type { StoredJob } from "~/hooks/useJobHistory";
 
 interface ProfileStatsProps {
   jobs: StoredJob[];

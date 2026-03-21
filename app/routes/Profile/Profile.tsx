@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useJobHistory } from "@elisym/sdk/react";
+import { useJobHistory } from "~/hooks/useJobHistory";
 import { useIdentity } from "~/hooks/useIdentity";
 import { ProfileCard } from "~/components/ProfileCard";
 import { ProfileStats } from "~/components/ProfileStats";

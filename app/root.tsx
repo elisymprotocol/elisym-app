@@ -2,8 +2,6 @@ import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import { Providers } from "~/components/Providers";
 import { Header } from "~/components/Header";
 import { Footer } from "~/components/Footer";
-import { ChatFab } from "~/components/ChatFab";
-import { ChatPanel } from "~/components/ChatPanel";
 import { ProviderWizard } from "~/components/ProviderWizard";
 import { Toaster } from "sonner";
 import "./app.css";
@@ -22,8 +20,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Header />
           <main className="flex-1">{children}</main>
           <Footer />
-          <ChatFab />
-          <ChatPanel />
           <ProviderWizard />
           <Toaster theme="dark" position="bottom-left" />
         </Providers>

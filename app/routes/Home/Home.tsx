@@ -1,4 +1,4 @@
-import { useAgents } from "@elisym/sdk/react";
+import { useAgents } from "~/hooks/useAgents";
 import { useAgentDisplay } from "~/hooks/useAgentDisplay";
 import { useUI } from "~/contexts/UIContext";
 import { HeroSection } from "~/components/HeroSection";
@@ -7,7 +7,7 @@ import { FilterBar, KNOWN_CATEGORIES } from "~/components/FilterBar";
 import { AgentCard } from "~/components/AgentCard";
 
 export default function Home() {
-  const { data: agents, isLoading } = useAgents();
+  const { data: agents = [], isLoading } = useAgents();
   const displayAgents = useAgentDisplay(agents);
   const [state] = useUI();
 
@@ -32,7 +32,7 @@ export default function Home() {
       <div className="max-w-6xl mx-auto py-8 px-6">
         <FilterBar />
 
-        {isLoading && displayAgents.length === 0 ? (
+        {isLoading && agents.length === 0 ? (
           <p className="text-text-2 text-center py-15 col-span-full">
             Loading agents from Nostr relays...
           </p>

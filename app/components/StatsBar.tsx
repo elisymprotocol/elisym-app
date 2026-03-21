@@ -1,4 +1,4 @@
-import { useStats } from "@elisym/sdk/react";
+import { useStats } from "~/hooks/useStats";
 import { formatSol } from "@elisym/sdk";
 
 export function StatsBar() {

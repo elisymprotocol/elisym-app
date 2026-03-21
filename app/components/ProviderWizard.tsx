@@ -1,7 +1,7 @@
 import { useRef, useCallback, useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useElisymClient } from "@elisym/sdk/react";
+import { useElisymClient } from "~/hooks/useElisymClient";
 import { ElisymIdentity, toDTag, type CapabilityCard } from "@elisym/sdk";
 import { toast } from "sonner";
 import { useUI } from "~/contexts/UIContext";
