@@ -1,38 +1,41 @@
-import type { StoredJob } from "~/hooks/useJobHistory";
+import Decimal from "decimal.js-light";
+import { useStats } from "~/hooks/useStats";
+import { useOptionalIdentity } from "~/hooks/useIdentity";
+import { useElisymClient } from "~/hooks/useElisymClient";
+import { useLocalQuery } from "~/hooks/useLocalQuery";
+import type { Filter } from "nostr-tools";
 
-interface ProfileStatsProps {
-  jobs: StoredJob[];
-}
+export function ProfileStats() {
+  const { client } = useElisymClient();
+  const idCtx = useOptionalIdentity();
+  const pubkey = idCtx?.publicKey ?? "";
 
-export function ProfileStats({ jobs }: ProfileStatsProps) {
-  const ordered = jobs.length;
-  const fulfilled = jobs.filter((j) => j.status === "completed").length;
-  let spent = 0;
-  for (const j of jobs) {
-    if (j.paymentAmount) {
-      spent += j.paymentAmount;
-    }
-  }
-  const spentSol = (spent / 1_000_000_000).toFixed(2);
+  const { data: earned } = useLocalQuery<number>({
+    queryKey: ["earned-lamports", pubkey],
+    queryFn: async () => {
+      // Fetch all job results authored by this pubkey (kind:6100)
+      const results = await client.pool.querySync({
+        kinds: [6100],
+        authors: [pubkey],
+      } as Filter);
 
-  const stats = [
-    { value: String(ordered), label: "Ordered" },
-    { value: String(fulfilled), label: "Fulfilled" },
-    { value: `${spentSol} SOL`, label: "Spent" },
-    { value: "0.00 SOL", label: "Earned" },
-  ];
+      let total = 0;
+      for (const ev of results) {
+        const amtTag = ev.tags.find((t) => t[0] === "amount");
+        if (amtTag?.[1]) total += parseInt(amtTag[1], 10);
+      }
+      return total;
+    },
+    enabled: !!pubkey,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const earnedSol = new Decimal(earned ?? 0).div(1e9).toFixed(2);
 
   return (
-    <div className="grid grid-cols-4 gap-4 max-sm:grid-cols-1">
-      {stats.map((s) => (
-        <div
-          key={s.label}
-          className="text-center py-5 bg-surface-2 rounded-xl"
-        >
-          <div className="text-2xl font-bold mb-1">{s.value}</div>
-          <div className="text-[12.5px] text-text-2">{s.label}</div>
-        </div>
-      ))}
+    <div className="text-center py-5 bg-surface-2 rounded-xl">
+      <div className="text-2xl font-bold mb-1">{earnedSol} SOL</div>
+      <div className="text-[12.5px] text-text-2">Earned</div>
     </div>
   );
 }

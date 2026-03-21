@@ -6,6 +6,7 @@ import { nip19 } from "nostr-tools";
 import { MarbleAvatar } from "./MarbleAvatar";
 import { useBuyCapability } from "~/hooks/useBuyCapability";
 import { useOptionalIdentity } from "~/hooks/useIdentity";
+import { usePingAgent, type PingStatus } from "~/hooks/usePingAgent";
 import type { AgentDisplayData } from "~/hooks/useAgentDisplay";
 
 interface AgentDetailModalProps {
@@ -13,7 +14,18 @@ interface AgentDetailModalProps {
   onClose: () => void;
 }
 
+const STATUS_DOT: Record<PingStatus, string> = {
+  pinging: "bg-yellow-400 animate-pulse",
+  online: "bg-emerald-500",
+  offline: "bg-red-400",
+};
+
 export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
+  const idCtx = useOptionalIdentity();
+  const isOwn = idCtx?.publicKey === agent.pubkey;
+  const pingedStatus = usePingAgent(isOwn ? "" : agent.pubkey);
+  const pingStatus: PingStatus = isOwn ? "online" : pingedStatus;
+
   return (
     <div
       className="fixed inset-0 bg-black/25 z-[500] flex items-center justify-center backdrop-blur-sm"
@@ -37,8 +49,9 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
               )}
             </div>
             <div>
-              <h2 className="text-xl font-bold">
+              <h2 className="text-xl font-bold flex items-center gap-2">
                 {agent.name || truncateKey(nip19.npubEncode(agent.pubkey), 8)}
+                <span className={`size-2.5 rounded-full shrink-0 ${STATUS_DOT[pingStatus]}`} />
               </h2>
               <div className="font-mono text-xs text-text-2 mt-0.5">
                 {truncateKey(nip19.npubEncode(agent.pubkey))}
@@ -73,6 +86,7 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
               agentPubkey={agent.pubkey}
               agentName={agent.name}
               agentPicture={agent.picture}
+              pingStatus={pingStatus}
             />
           ))}
         </div>
@@ -97,11 +111,13 @@ function CapabilityItem({
   agentPubkey,
   agentName,
   agentPicture,
+  pingStatus,
 }: {
   card: CapabilityCard;
   agentPubkey: string;
   agentName: string;
   agentPicture?: string;
+  pingStatus: PingStatus;
 }) {
   const price = card.payment?.job_price;
   const isStatic = card.static === true;
@@ -190,7 +206,7 @@ function CapabilityItem({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleBuy}
-                    disabled={buying || !publicKey || (!isStatic && !input.trim())}
+                    disabled={buying || !publicKey || (!isStatic && !input.trim()) || pingStatus !== "online"}
                     className="py-1.5 px-4 rounded-lg bg-accent text-white text-xs font-semibold border-none cursor-pointer hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {buttonLabel()}

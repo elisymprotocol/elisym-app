@@ -1,6 +1,4 @@
 import { Link } from "react-router";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useJobHistory } from "~/hooks/useJobHistory";
 import { useIdentity } from "~/hooks/useIdentity";
 import { ProfileCard } from "~/components/ProfileCard";
 import { ProfileStats } from "~/components/ProfileStats";
@@ -9,9 +7,6 @@ import { NostrKeys } from "~/components/NostrKeys";
 export default function Profile() {
   const { npub, publicKey: nostrPubkey, allIdentities, activeId } = useIdentity();
   const activeKeyName = allIdentities.find((e) => e.id === activeId)?.name;
-  const { publicKey } = useWallet();
-  const wallet = publicKey?.toBase58() ?? "";
-  const { jobs } = useJobHistory({ wallet });
 
   return (
     <div className="max-w-[800px] mx-auto py-10 px-6">
@@ -29,7 +24,7 @@ export default function Profile() {
       <ProfileCard npub={npub} pubkey={nostrPubkey} keyName={activeKeyName} />
 
       <div className="bg-surface border border-border rounded-2xl p-8 mb-6">
-        <ProfileStats jobs={jobs} />
+        <ProfileStats />
       </div>
 
       <NostrKeys />
