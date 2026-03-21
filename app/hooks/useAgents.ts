@@ -8,7 +8,6 @@ export function useAgents() {
   return useQuery<Agent[]>({
     queryKey: ["agents"],
     queryFn: () => client.discovery.fetchAgents("devnet"),
-    placeholderData: [],
     staleTime: 1000 * 60 * 2,
   });
 }
