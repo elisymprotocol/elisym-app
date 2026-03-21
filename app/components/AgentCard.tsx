@@ -24,6 +24,7 @@ export function AgentCard({ agent }: AgentCardProps) {
               <img
                 src={agent.picture}
                 alt={agent.name}
+                loading="lazy"
                 className="size-full object-cover"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";

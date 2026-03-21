@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAgents } from "~/hooks/useAgents";
 import { useAgentDisplay } from "~/hooks/useAgentDisplay";
 import { useStats } from "~/hooks/useStats";
@@ -8,6 +9,7 @@ import { StatsBar } from "~/components/StatsBar";
 import { FilterBar, KNOWN_CATEGORIES } from "~/components/FilterBar";
 import { AgentCard } from "~/components/AgentCard";
 import { toast } from "sonner";
+import type { AgentDisplayData } from "~/hooks/useAgentDisplay";
 
 const RELAYS = [
   "wss://relay.damus.io",
@@ -159,6 +161,76 @@ function BootLog({ lines }: { lines: LogLine[] }) {
   );
 }
 
+const COL_MIN_WIDTH = 320;
+const GAP = 20;
+const ROW_HEIGHT = 290;
+
+function useColumns(containerRef: React.RefObject<HTMLDivElement | null>) {
+  const [cols, setCols] = useState(3);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const width = el.clientWidth;
+      setCols(Math.max(1, Math.floor((width + GAP) / (COL_MIN_WIDTH + GAP))));
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [containerRef]);
+
+  return cols;
+}
+
+function VirtualGrid({ agents }: { agents: AgentDisplayData[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cols = useColumns(containerRef);
+  const rowCount = Math.ceil(agents.length / cols);
+
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => document.documentElement,
+    estimateSize: () => ROW_HEIGHT + GAP,
+    overscan: 3,
+  });
+
+  return (
+    <div ref={containerRef}>
+      <div
+        style={{ height: virtualizer.getTotalSize(), position: "relative" }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const startIdx = virtualRow.index * cols;
+          const rowAgents = agents.slice(startIdx, startIdx + cols);
+
+          return (
+            <div
+              key={virtualRow.index}
+              style={{
+                position: "absolute",
+                top: virtualRow.start,
+                left: 0,
+                right: 0,
+                display: "grid",
+                gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                gap: GAP,
+              }}
+            >
+              {rowAgents.map((agent) => (
+                <AgentCard key={agent.pubkey} agent={agent} />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const { data: agents, isLoading: agentsLoading, fromCache: agentsFromCache, isFetchedAfterMount: agentsSynced } = useAgents();
   const { data: stats, isLoading: statsLoading, fromCache: statsFromCache, isFetchedAfterMount: statsSynced } = useStats();
@@ -215,11 +287,7 @@ export default function Home() {
             No agents found for this category.
           </p>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-5">
-            {filtered.map((agent) => (
-              <AgentCard key={agent.pubkey} agent={agent} />
-            ))}
-          </div>
+          <VirtualGrid agents={filtered} />
         )}
       </div>
     </>
