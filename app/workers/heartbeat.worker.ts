@@ -1,0 +1,271 @@
+import {
+  ElisymClient,
+  ElisymIdentity,
+  PaymentService,
+  type CapabilityCard,
+} from "@elisym/sdk";
+import type { Filter, Event } from "nostr-tools";
+
+// --------------- IndexedDB (inline, no DOM deps) ---------------
+
+const DB_NAME = "elisym-cache";
+const STORE_NAME = "kv";
+
+let dbPromise: Promise<IDBDatabase> | null = null;
+
+function getDB(): Promise<IDBDatabase> {
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => {
+        dbPromise = null;
+        reject(req.error);
+      };
+    });
+  }
+  return dbPromise;
+}
+
+async function cacheGet<T>(key: string): Promise<T | undefined> {
+  try {
+    const db = await getDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const req = tx.objectStore(STORE_NAME).get(key);
+      req.onsuccess = () => resolve(req.result as T | undefined);
+      req.onerror = () => resolve(undefined);
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+// --------------- Types ---------------
+
+type SubCloser = { close: (reason?: string) => void };
+
+interface StartMessage {
+  type: "start";
+  secretKeyHex: string;
+  capabilities: { card: CapabilityCard; dTag: string }[];
+}
+
+interface StopMessage {
+  type: "stop";
+}
+
+type InMessage = StartMessage | StopMessage;
+
+interface LogMessage {
+  type: "log";
+  level: "info" | "error";
+  message: string;
+}
+
+interface SaleMessage {
+  type: "sale";
+  capabilityName: string;
+  amount: number; // lamports
+}
+
+type OutMessage = LogMessage | SaleMessage;
+
+// --------------- State ---------------
+
+const HEARTBEAT_MS = 60_000;
+const PING_COOLDOWN_MS = 1000;
+
+let client: ElisymClient | null = null;
+let identity: ElisymIdentity | null = null;
+
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+let dmSub: SubCloser | null = null;
+let jobSub: SubCloser | null = null;
+const paymentSubs: SubCloser[] = [];
+const processedJobs = new Set<string>();
+const lastPings = new Map<string, number>();
+
+function post(msg: OutMessage) {
+  self.postMessage(msg);
+}
+
+function log(message: string) {
+  post({ type: "log", level: "info", message });
+}
+
+// --------------- Cleanup ---------------
+
+function cleanup() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+  if (dmSub) {
+    dmSub.close();
+    dmSub = null;
+  }
+  if (jobSub) {
+    jobSub.close();
+    jobSub = null;
+  }
+  for (const sub of paymentSubs) sub.close();
+  paymentSubs.length = 0;
+  processedJobs.clear();
+  lastPings.clear();
+
+  if (client) {
+    client.close();
+    client = null;
+  }
+  identity = null;
+}
+
+// --------------- Start ---------------
+
+function start(msg: StartMessage) {
+  cleanup();
+
+  client = new ElisymClient();
+  identity = ElisymIdentity.fromHex(msg.secretKeyHex);
+  const caps = msg.capabilities;
+
+  if (caps.length === 0) {
+    log("No capabilities — heartbeat idle");
+    return;
+  }
+
+  // --- Heartbeat ---
+  const lastCap = caps[caps.length - 1]!;
+
+  const publishHeartbeat = () => {
+    client!.discovery
+      .publishCapability(identity!, lastCap.card)
+      .catch((e) => post({ type: "log", level: "error", message: `Heartbeat error: ${e}` }));
+  };
+
+  publishHeartbeat();
+  heartbeatInterval = setInterval(publishHeartbeat, HEARTBEAT_MS);
+  log("Heartbeat started");
+
+  // --- Ping/pong ---
+  dmSub = client.messaging.subscribeToMessages(
+    identity,
+    (senderPubkey: string, content: string) => {
+      try {
+        const msg = JSON.parse(content);
+        if (msg.type === "elisym_ping" && msg.nonce) {
+          const now = Date.now();
+          const last = lastPings.get(senderPubkey) ?? 0;
+          if (now - last < PING_COOLDOWN_MS) return;
+          lastPings.set(senderPubkey, now);
+
+          client!.messaging
+            .sendMessage(
+              identity!,
+              senderPubkey,
+              JSON.stringify({ type: "elisym_pong", nonce: msg.nonce }),
+            )
+            .catch(console.error);
+        }
+      } catch {
+        // not JSON
+      }
+    },
+  );
+  log("Ping responder active");
+
+  // --- Job handler ---
+  const capByTag = new Map<string, { card: CapabilityCard; dTag: string }>();
+  for (const cap of caps) {
+    for (const tag of cap.card.capabilities) {
+      capByTag.set(tag, cap);
+    }
+    capByTag.set(cap.dTag, cap);
+  }
+
+  const handleJob = async (event: Event) => {
+    if (processedJobs.has(event.id)) return;
+    processedJobs.add(event.id);
+
+    const requestedTag = event.tags.find((t) => t[0] === "t" && t[1] !== "elisym")?.[1];
+    const matchedCap = requestedTag ? capByTag.get(requestedTag) : caps[0];
+    if (!matchedCap) return;
+
+    const price = matchedCap.card.payment?.job_price ?? 0;
+    const walletAddress = matchedCap.card.payment?.address;
+
+    log(`Job ${event.id.slice(0, 8)}... for ${matchedCap.card.name}`);
+
+    if (price > 0 && walletAddress) {
+      const paymentRequest = PaymentService.createPaymentRequest(walletAddress, price);
+      const paymentRequestJson = JSON.stringify(paymentRequest);
+
+      await client!.marketplace.submitPaymentRequiredFeedback(
+        identity!,
+        event,
+        price,
+        paymentRequestJson,
+      );
+
+      const paymentSub = client!.pool.subscribe(
+        {
+          kinds: [7000],
+          "#e": [event.id],
+          since: Math.floor(Date.now() / 1000) - 5,
+        } as Filter,
+        async (feedbackEv) => {
+          const statusTag = feedbackEv.tags.find((t) => t[0] === "status");
+          if (statusTag?.[1] !== "payment-completed") return;
+
+          await deliverResult(event, matchedCap.dTag, matchedCap.card.name, price);
+          paymentSub.close();
+        },
+      );
+      paymentSubs.push(paymentSub);
+    } else {
+      await deliverResult(event, matchedCap.dTag, matchedCap.card.name, 0);
+    }
+  };
+
+  const deliverResult = async (requestEvent: Event, dTag: string, capName: string, amount: number) => {
+    const result = await cacheGet<string>(`capability-result:${dTag}`);
+    const content = result || "No delivery content configured.";
+
+    await client!.marketplace.submitJobResult(
+      identity!,
+      requestEvent,
+      content,
+      amount > 0 ? amount : undefined,
+    );
+    log(`Delivered result for ${requestEvent.id.slice(0, 8)}...`);
+    post({ type: "sale", capabilityName: capName, amount });
+  };
+
+  jobSub = client.marketplace.subscribeToJobRequests(
+    identity,
+    [5100],
+    (event) => void handleJob(event),
+  );
+  log("Job handler active");
+}
+
+// --------------- Message handler ---------------
+
+self.onmessage = (e: MessageEvent<InMessage>) => {
+  switch (e.data.type) {
+    case "start":
+      start(e.data);
+      break;
+    case "stop":
+      cleanup();
+      log("Worker stopped");
+      break;
+  }
+};
