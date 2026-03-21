@@ -163,6 +163,8 @@ export function useBuyCapability({
             toast.error(errMsg);
           },
         },
+        120_000,
+        identity.secretKey,
       );
 
       cleanupRef.current = cleanup;
