@@ -7,6 +7,7 @@ import { HeroSection } from "~/components/HeroSection";
 import { StatsBar } from "~/components/StatsBar";
 import { FilterBar, KNOWN_CATEGORIES } from "~/components/FilterBar";
 import { AgentCard } from "~/components/AgentCard";
+import { toast } from "sonner";
 
 const RELAYS = [
   "wss://relay.damus.io",
@@ -159,11 +160,25 @@ function BootLog({ lines }: { lines: LogLine[] }) {
 }
 
 export default function Home() {
-  const { data: agents, isLoading: agentsLoading } = useAgents();
-  const { data: stats, isLoading: statsLoading } = useStats();
+  const { data: agents, isLoading: agentsLoading, fromCache: agentsFromCache, isFetchedAfterMount: agentsSynced } = useAgents();
+  const { data: stats, isLoading: statsLoading, fromCache: statsFromCache, isFetchedAfterMount: statsSynced } = useStats();
   const displayAgents = useAgentDisplay(agents ?? []);
   const [state] = useUI();
+
+  // Cold start = no cached data at all
+  const isColdStart = agentsLoading && !agentsFromCache;
+
+  // Boot log only runs on cold start
   const bootLines = useBootLog(!agentsLoading, !statsLoading);
+
+  // Toast when background sync completes (only if we showed cached data first)
+  const toastShown = useRef(false);
+  useEffect(() => {
+    if (agentsFromCache && agentsSynced && !toastShown.current) {
+      toastShown.current = true;
+      toast.success("Synced with Nostr relays");
+    }
+  }, [agentsFromCache, agentsSynced]);
 
   const filtered =
     state.currentFilter === "all"
@@ -178,7 +193,7 @@ export default function Home() {
             ),
           );
 
-  if (agentsLoading) {
+  if (isColdStart) {
     return (
       <>
         <HeroSection />

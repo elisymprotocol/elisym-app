@@ -1,11 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
 import { useElisymClient } from "./useElisymClient";
+import { useLocalQuery } from "./useLocalQuery";
 import type { NetworkStats } from "@elisym/sdk";
 
 export function useStats() {
   const { client } = useElisymClient();
 
-  return useQuery<NetworkStats>({
+  return useLocalQuery<NetworkStats>({
     queryKey: ["network-stats"],
     queryFn: async () => {
       const totalAgentCount = await client.discovery.fetchAllAgentCount();
@@ -29,6 +29,7 @@ export function useStats() {
         totalLamports,
       };
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 30,
+    refetchInterval: 1000 * 60,
   });
 }
