@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAgents } from "~/hooks/useAgents";
 import { useAgentDisplay } from "~/hooks/useAgentDisplay";
 import { useStats } from "~/hooks/useStats";
@@ -8,39 +8,118 @@ import { StatsBar } from "~/components/StatsBar";
 import { FilterBar, KNOWN_CATEGORIES } from "~/components/FilterBar";
 import { AgentCard } from "~/components/AgentCard";
 
-const BOOT_LINES = [
-  { text: "> Initializing elisym protocol v0.1.0...", delay: 0 },
-  { text: "> Connecting to relay.damus.io...", delay: 400 },
-  { text: "  [OK] relay.damus.io", delay: 900 },
-  { text: "> Connecting to nos.lol...", delay: 1100 },
-  { text: "  [OK] nos.lol", delay: 1500 },
-  { text: "> Connecting to relay.nostr.band...", delay: 1700 },
-  { text: "  [OK] relay.nostr.band", delay: 2100 },
-  { text: "> Fetching NIP-90 capabilities...", delay: 2400 },
-  { text: "  Scanning kind:31990 events...", delay: 2900 },
-  { text: "> Resolving agent profiles...", delay: 3400 },
-  { text: "  // coffee break for the AI...", delay: 3900 },
-  { text: "> Collecting network statistics...", delay: 4400 },
-  { text: "  Querying completed jobs & payment volume...", delay: 4900 },
-  { text: "> Verifying Solana payment routes...", delay: 5200 },
-  { text: "  [OK] devnet RPC responsive", delay: 5600 },
-  { text: "> Almost there, warming up the marketplace...", delay: 6000 },
+const RELAYS = [
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+  "wss://relay.nostr.band",
 ];
 
-function BootLog() {
-  const [visibleCount, setVisibleCount] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
+interface LogLine {
+  text: string;
+  type: "info" | "ok" | "error" | "comment" | "spinner";
+}
 
-  useEffect(() => {
-    const timers = BOOT_LINES.map((line, i) =>
-      setTimeout(() => setVisibleCount(i + 1), line.delay),
-    );
-    return () => timers.forEach(clearTimeout);
+function pingRelay(url: string): Promise<{ url: string; ms: number }> {
+  return new Promise((resolve, reject) => {
+    const start = performance.now();
+    const ws = new WebSocket(url);
+    const timeout = setTimeout(() => {
+      ws.close();
+      reject(new Error("timeout"));
+    }, 5000);
+    ws.onopen = () => {
+      clearTimeout(timeout);
+      const ms = Math.round(performance.now() - start);
+      ws.close();
+      resolve({ url, ms });
+    };
+    ws.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error("connection failed"));
+    };
+  });
+}
+
+function useBootLog(agentsLoaded: boolean, statsLoaded: boolean) {
+  const [lines, setLines] = useState<LogLine[]>([]);
+  const started = useRef(false);
+
+  const push = useCallback((...newLines: LogLine[]) => {
+    setLines((prev) => [...prev, ...newLines]);
   }, []);
+
+  // Relay pings — run once on mount
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+
+    push({ text: "> Initializing elisym protocol v0.1.0...", type: "info" });
+
+    (async () => {
+      let connected = 0;
+      for (const relay of RELAYS) {
+        const name = relay.replace("wss://", "");
+        push({ text: `> Connecting to ${name}...`, type: "info" });
+        try {
+          const { ms } = await pingRelay(relay);
+          push({ text: `  [OK] ${name} (${ms}ms)`, type: "ok" });
+          connected++;
+        } catch {
+          push({ text: `  [SKIP] ${name} — unreachable`, type: "info" });
+        }
+      }
+      push({ text: `  (${connected}/${RELAYS.length} relays online — ${connected >= 2 ? "sufficient" : "degraded"})`, type: connected >= 2 ? "ok" : "error" });
+      push(
+        { text: "> Fetching NIP-90 capabilities...", type: "info" },
+        { text: "  Scanning kind:31990 events across relays...", type: "info" },
+      );
+    })();
+  }, [push]);
+
+  // Track agents query
+  const agentsSeen = useRef(false);
+  useEffect(() => {
+    if (agentsLoaded && !agentsSeen.current) {
+      agentsSeen.current = true;
+      push(
+        { text: "  [OK] Agent discovery complete", type: "ok" },
+        { text: "  // agents located, no one ran away", type: "comment" },
+      );
+    }
+  }, [agentsLoaded, push]);
+
+  // Track stats query
+  const statsSeen = useRef(false);
+  useEffect(() => {
+    if (statsLoaded && !statsSeen.current) {
+      statsSeen.current = true;
+      push(
+        { text: "> Collecting network statistics...", type: "info" },
+        { text: "  [OK] Jobs & payment volume loaded", type: "ok" },
+      );
+    }
+  }, [statsLoaded, push]);
+
+  // Final line when everything is done
+  const doneSeen = useRef(false);
+  useEffect(() => {
+    if (agentsLoaded && statsLoaded && !doneSeen.current) {
+      doneSeen.current = true;
+      push({ text: "> Marketplace ready. Welcome to elisym.", type: "ok" });
+    }
+  }, [agentsLoaded, statsLoaded, push]);
+
+  return lines;
+}
+
+function BootLog({ lines }: { lines: LogLine[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isComplete = lines.length > 0 && lines[lines.length - 1]?.type === "ok"
+    && lines[lines.length - 1]?.text.includes("Marketplace ready");
 
   useEffect(() => {
     containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight });
-  }, [visibleCount]);
+  }, [lines.length]);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
@@ -54,31 +133,24 @@ function BootLog() {
         </div>
         {/* Log body */}
         <div ref={containerRef} className="p-5 font-mono text-[13px] leading-6 max-h-80 overflow-y-auto">
-          {BOOT_LINES.slice(0, visibleCount).map((line, i) => (
+          {lines.map((line, i) => (
             <div
               key={i}
               className={`animate-[fadeIn_0.2s_ease-out] ${
-                line.text.includes("[OK]")
+                line.type === "ok"
                   ? "text-emerald-400"
-                  : line.text.includes("//")
-                    ? "text-[#4a5068] italic"
-                    : "text-[#8b93ad]"
+                  : line.type === "error"
+                    ? "text-red-400"
+                    : line.type === "comment"
+                      ? "text-[#4a5068] italic"
+                      : "text-[#8b93ad]"
               }`}
             >
               {line.text}
             </div>
           ))}
-          {visibleCount > 0 && visibleCount < BOOT_LINES.length && (
+          {!isComplete && (
             <span className="inline-block w-2 h-4 bg-emerald-400 animate-pulse ml-0.5 align-middle" />
-          )}
-          {visibleCount >= BOOT_LINES.length && (
-            <div className="text-emerald-400 mt-1 flex items-center gap-2">
-              <svg className="size-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity="0.3" />
-                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              Loading agents...
-            </div>
           )}
         </div>
       </div>
@@ -87,10 +159,11 @@ function BootLog() {
 }
 
 export default function Home() {
-  const { data: agents, isLoading } = useAgents();
-  useStats(); // prefetch stats while boot log is showing
+  const { data: agents, isLoading: agentsLoading } = useAgents();
+  const { data: stats, isLoading: statsLoading } = useStats();
   const displayAgents = useAgentDisplay(agents ?? []);
   const [state] = useUI();
+  const bootLines = useBootLog(!agentsLoading, !statsLoading);
 
   const filtered =
     state.currentFilter === "all"
@@ -105,11 +178,11 @@ export default function Home() {
             ),
           );
 
-  if (isLoading) {
+  if (agentsLoading) {
     return (
       <>
         <HeroSection />
-        <BootLog />
+        <BootLog lines={bootLines} />
       </>
     );
   }
