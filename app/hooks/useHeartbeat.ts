@@ -8,6 +8,36 @@ import { formatSol, type CapabilityCard } from "@elisym/sdk";
 import { toast } from "sonner";
 import type { Filter } from "nostr-tools";
 
+const DELETED_DTAGS_KEY = "elisym:deleted-dtags";
+
+/** Get locally-deleted d-tags (survives page refresh, relay-independent). */
+export function getDeletedDTags(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_DTAGS_KEY);
+    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+/** Mark d-tags as deleted locally. */
+export function addDeletedDTags(dTags: Iterable<string>): void {
+  const current = getDeletedDTags();
+  for (const d of dTags) current.add(d);
+  localStorage.setItem(DELETED_DTAGS_KEY, JSON.stringify([...current]));
+}
+
+/** Remove d-tags from the deleted list (when re-publishing). */
+export function removeDeletedDTags(dTags: Iterable<string>): void {
+  const current = getDeletedDTags();
+  for (const d of dTags) current.delete(d);
+  if (current.size > 0) {
+    localStorage.setItem(DELETED_DTAGS_KEY, JSON.stringify([...current]));
+  } else {
+    localStorage.removeItem(DELETED_DTAGS_KEY);
+  }
+}
+
 /**
  * Spawns a Web Worker that handles:
  * - Heartbeat (republish last capability every 60s)
@@ -34,12 +64,18 @@ export function useHeartbeat() {
         authors: [pubkey],
         "#t": ["elisym"],
       } as Filter);
+
+      // Local-first: filter out d-tags that were deleted locally
+      // (relay tombstones are unreliable when relays are down)
+      const deletedDTags = getDeletedDTags();
+
       const byDTag = new Map<string, { card: CapabilityCard; dTag: string; ts: number }>();
       for (const ev of events) {
         try {
           const parsed = JSON.parse(ev.content) as CapabilityCard & { deleted?: boolean };
           if (!parsed.name || parsed.deleted) continue;
           const dTag = ev.tags.find((t: string[]) => t[0] === "d")?.[1] ?? "";
+          if (deletedDTags.has(dTag)) continue;
           const existing = byDTag.get(dTag);
           if (!existing || ev.created_at > existing.ts) {
             byDTag.set(dTag, { card: parsed, dTag, ts: ev.created_at });

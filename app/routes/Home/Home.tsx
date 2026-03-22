@@ -11,6 +11,8 @@ const RELAYS = [
   "wss://relay.damus.io",
   "wss://nos.lol",
   "wss://relay.nostr.band",
+  "wss://relay.primal.net",
+  "wss://purplepag.es",
 ];
 
 /** Build page numbers with ellipsis: [1, '...', 4, 5, 6, '...', 20] */

@@ -10,6 +10,7 @@ import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
 import { uploadToNostrBuild } from "~/lib/uploadImage";
 import { cacheGet, cacheSet, cacheDel } from "~/lib/localCache";
+import { addDeletedDTags, removeDeletedDTags } from "~/hooks/useHeartbeat";
 import type { Filter } from "nostr-tools";
 
 interface NostrProfile {
@@ -252,10 +253,11 @@ export function ProviderWizard() {
 
     track("publish-capabilities", { count: names.length });
     setPublishing(true);
+    const saveId = toast.loading("Saving...");
     try {
       const identity = getIdentity();
 
-      // Orphan cleanup
+      // Determine what to delete and what to keep
       const currentDTags = new Set(
         wiz.products.filter((p) => p.name).map((p) => toDTag(p.name)),
       );
@@ -265,17 +267,65 @@ export function ProviderWizard() {
           if (!currentDTags.has(dTag)) dTagsToDelete.add(dTag);
         }
       }
+
+      // Build final published products list early (needed for optimistic update)
+      const walletAddress = publicKey?.toBase58();
+      const publishedProducts = wiz.products
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }) => p.name);
+      const walletAddr = publicKey?.toBase58();
+
+      // Pre-compute optimistic cache
+      const resolvedImages = new Map<number, string>();
+      // Pre-fill with existing image URLs (uploads will overwrite below)
+      for (const { p, i } of publishedProducts) {
+        if (p.photoPreview && !p.photoPreview.startsWith("data:")) {
+          resolvedImages.set(i, p.photoPreview);
+        }
+      }
+
+      const buildPublishedCards = () => publishedProducts
+        .map(({ p, i }) => {
+          const caps = p.tags.length > 0 ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-")) : ["general"];
+          const pr = p.price ? Math.round(parseFloat(p.price.replace(",", ".")) * 1_000_000_000) : undefined;
+          return {
+            card: {
+              name: p.name, description: p.desc, capabilities: caps,
+              payment: walletAddr ? { chain: "solana" as const, network: "devnet" as const, address: walletAddr, ...(pr != null ? { job_price: pr } : {}) } : undefined,
+              image: resolvedImages.get(i),
+              static: true,
+            },
+            dTag: toDTag(p.name),
+          };
+        });
+
+      // 1. STOP heartbeat worker FIRST by updating cache before publishing tombstones.
+      //    This prevents the worker from republishing deleted capabilities
+      //    (heartbeat fires every 60s and would overwrite the tombstone).
+      if (dTagsToDelete.size > 0) {
+        queryClient.setQueryData(["nostr-capabilities", nostrPubkey], buildPublishedCards());
+        localStorage.removeItem("elisym:provider-cards");
+        // Let React commit the re-render so useHeartbeat terminates the worker
+        await new Promise((r) => setTimeout(r, 150));
+      }
+
+      // 2. Now publish tombstones — worker is stopped, no heartbeat will overwrite
+      //    Also mark as deleted locally so refetch from relays won't resurrect them
+      if (dTagsToDelete.size > 0) {
+        addDeletedDTags(dTagsToDelete);
+      }
       for (const dTag of dTagsToDelete) {
         await client.discovery.deleteCapability(identity, dTag);
         await cacheDel(`capability-result:${dTag}`);
       }
       setRemovedDTags([]);
 
-      const walletAddress = publicKey?.toBase58();
-
-      // Track resolved image URLs (after upload) keyed by product index
-      const resolvedImages = new Map<number, string>();
-
+      // 3. Upload images & publish remaining products
+      //    Un-delete d-tags that are being re-published
+      const publishingDTags = wiz.products.filter((p) => p.name).map((p) => toDTag(p.name));
+      if (publishingDTags.length > 0) {
+        removeDeletedDTags(publishingDTags);
+      }
       for (let i = 0; i < wiz.products.length; i++) {
         const product = wiz.products[i]!;
         if (!product.name) continue;
@@ -307,10 +357,7 @@ export function ProviderWizard() {
         await cacheSet(`capability-result:${toDTag(product.name)}`, product.result);
       }
 
-      // localStorage backup — use resolved (uploaded) image URLs
-      const publishedProducts = wiz.products
-        .map((p, i) => ({ p, i }))
-        .filter(({ p }) => p.name);
+      // 4. Update localStorage
       if (publishedProducts.length > 0) {
         localStorage.setItem(
           "elisym:provider-cards",
@@ -323,41 +370,28 @@ export function ProviderWizard() {
             })),
           ),
         );
+      } else {
+        localStorage.removeItem("elisym:provider-cards");
       }
 
-      // Optimistic cache update — use resolved (uploaded) image URLs
-      const walletAddr = publicKey?.toBase58();
-      const publishedCards: { card: CapabilityCard; dTag: string }[] = publishedProducts
-        .map(({ p, i }) => {
-          const caps = p.tags.length > 0 ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-")) : ["general"];
-          const pr = p.price ? Math.round(parseFloat(p.price.replace(",", ".")) * 1_000_000_000) : undefined;
-          return {
-            card: {
-              name: p.name, description: p.desc, capabilities: caps,
-              payment: walletAddr ? { chain: "solana" as const, network: "devnet" as const, address: walletAddr, ...(pr != null ? { job_price: pr } : {}) } : undefined,
-              image: resolvedImages.get(i),
-              static: true,
-            },
-            dTag: toDTag(p.name),
-          };
-        });
+      // 5. Final optimistic cache (with uploaded image URLs)
+      const publishedCards = buildPublishedCards();
       queryClient.setQueryData(["nostr-capabilities", nostrPubkey], publishedCards);
+      await cacheSet(`nostr-capabilities:${nostrPubkey}`, publishedCards);
 
       setSuccessType("capabilities");
 
-      // Resync from relays in background
-      const syncId = toast.loading("Syncing with relays...");
+      // Resync agents listing from relays (don't refetch own capabilities —
+      // the optimistic cache is authoritative, relay may still serve stale data)
+      toast.loading("Syncing with relays...", { id: saveId });
       try {
-        await Promise.all([
-          queryClient.refetchQueries({ queryKey: ["agents"] }),
-          queryClient.refetchQueries({ queryKey: ["nostr-capabilities", nostrPubkey] }),
-        ]);
-        toast.success("Synced with relays", { id: syncId });
+        await queryClient.refetchQueries({ queryKey: ["agents"] });
+        toast.success("Saved", { id: saveId });
       } catch {
-        toast.error("Sync failed", { id: syncId });
+        toast.success("Saved (sync pending)", { id: saveId });
       }
     } catch (err) {
-      toast.error("Failed: " + (err instanceof Error ? err.message : "Unknown error"));
+      toast.error("Failed: " + (err instanceof Error ? err.message : "Unknown error"), { id: saveId });
     } finally {
       setPublishing(false);
     }
