@@ -171,20 +171,21 @@ function start(msg: StartMessage) {
   log("Ping responder active");
 
   // --- Job handler ---
-  const capByTag = new Map<string, { card: CapabilityCard; dTag: string }>();
-  for (const cap of caps) {
-    for (const tag of cap.card.capabilities) {
-      capByTag.set(tag, cap);
-    }
-    capByTag.set(cap.dTag, cap);
-  }
+  const findCap = (tag: string | undefined) => {
+    if (!tag) return caps[0];
+    // First try exact d-tag match
+    const byDTag = caps.find((c) => c.dTag === tag);
+    if (byDTag) return byDTag;
+    // Then try capability tag match
+    return caps.find((c) => c.card.capabilities.includes(tag)) ?? caps[0];
+  };
 
   const handleJob = async (event: Event) => {
     if (processedJobs.has(event.id)) return;
     processedJobs.add(event.id);
 
     const requestedTag = event.tags.find((t) => t[0] === "t" && t[1] !== "elisym")?.[1];
-    const matchedCap = requestedTag ? capByTag.get(requestedTag) : caps[0];
+    const matchedCap = findCap(requestedTag);
     if (!matchedCap) return;
 
     const price = matchedCap.card.payment?.job_price ?? 0;

@@ -242,7 +242,15 @@ export function ProviderWizard() {
 
   async function handleSaveCapabilities() {
     if (publishing) return;
-    track("publish-capabilities", { count: wiz.products.filter((p) => p.name).length });
+    // Check for duplicate names
+    const names = wiz.products.filter((p) => p.name).map((p) => toDTag(p.name));
+    const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+    if (dupes.length > 0) {
+      toast.error("Product names must be unique");
+      return;
+    }
+
+    track("publish-capabilities", { count: names.length });
     setPublishing(true);
     try {
       const identity = getIdentity();

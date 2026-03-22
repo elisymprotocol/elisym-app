@@ -3,6 +3,7 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import {
   ElisymIdentity,
   PaymentService,
+  toDTag,
   type CapabilityCard,
   type PaymentRequestData,
 } from "@elisym/sdk";
@@ -63,7 +64,7 @@ export function useBuyCapability({
         ElisymIdentity.fromLocalStorage("elisym:identity") ??
         ElisymIdentity.generate();
 
-      const capability = card.capabilities[0] || card.name;
+      const capability = toDTag(card.name);
 
       // 1. Submit job request
       const jobEventId = await client.marketplace.submitJobRequest(identity, {

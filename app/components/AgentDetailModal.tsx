@@ -151,7 +151,7 @@ function CapabilityItem({
     }
     track("buy", { agent: agentName, price: price ? formatSol(price) : "free" });
     if (isStatic) {
-      buy();
+      buy(card.name);
     } else {
       buy(input);
     }
