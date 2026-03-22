@@ -81,9 +81,9 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
           </div>
         )}
 
-        {/* Capabilities */}
+        {/* Products */}
         <div className="text-sm font-semibold mb-3">
-          Capabilities ({agent.cards.length})
+          Products ({agent.cards.length})
         </div>
 
         <div className="flex flex-col gap-3">

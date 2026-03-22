@@ -284,6 +284,103 @@ function start(msg: StartMessage) {
 
   // --- Subscriptions ---
   setupSubscriptions();
+
+  // --- Recover pending jobs ---
+  void recoverPendingJobs();
+}
+
+// --------------- Job Recovery ---------------
+
+async function recoverPendingJobs() {
+  if (!client || !identity) return;
+
+  try {
+    const myPubkey = identity.publicKey;
+    const since = Math.floor(Date.now() / 1000) - 86400; // last 24h
+
+    // 1. Fetch job requests addressed to us
+    const requests = await client.pool.querySync({
+      kinds: [5100],
+      "#p": [myPubkey],
+      since,
+    } as Filter);
+
+    if (requests.length === 0) return;
+
+    const requestIds = requests.map((r) => r.id);
+
+    // 2. Fetch feedback for these jobs
+    const feedbacks = await client.pool.queryBatchedByTag(
+      { kinds: [7000] } as Filter,
+      "e",
+      requestIds,
+    );
+
+    // 3. Find jobs with payment-completed
+    const paidJobIds = new Set<string>();
+    for (const fb of feedbacks) {
+      const statusTag = fb.tags.find((t) => t[0] === "status");
+      if (statusTag?.[1] !== "payment-completed") continue;
+      const eTag = fb.tags.find((t) => t[0] === "e");
+      if (eTag?.[1]) paidJobIds.add(eTag[1]);
+    }
+
+    // Also include free jobs (no payment feedback at all = no price)
+    const jobsWithFeedback = new Set<string>();
+    for (const fb of feedbacks) {
+      const eTag = fb.tags.find((t) => t[0] === "e");
+      if (eTag?.[1]) jobsWithFeedback.add(eTag[1]);
+    }
+
+    // 4. Fetch results already delivered by us
+    const results = await client.pool.queryBatchedByTag(
+      { kinds: [6100], authors: [myPubkey] } as Filter,
+      "e",
+      requestIds,
+    );
+
+    const deliveredJobIds = new Set<string>();
+    for (const r of results) {
+      const eTag = r.tags.find((t) => t[0] === "e");
+      if (eTag?.[1]) deliveredJobIds.add(eTag[1]);
+    }
+
+    // 5. Find undelivered jobs: paid but no result, or free (no feedback) and no result
+    const pendingJobs = requests.filter((req) => {
+      if (deliveredJobIds.has(req.id)) return false; // already delivered
+      if (processedJobs.has(req.id)) return false; // already handled in this session
+      // Paid but not delivered
+      if (paidJobIds.has(req.id)) return true;
+      // Free job (no payment feedback) — check if capability is free
+      if (!jobsWithFeedback.has(req.id)) {
+        const requestedTag = req.tags.find((t) => t[0] === "t" && t[1] !== "elisym")?.[1];
+        const matchedCap = findCap(requestedTag);
+        if (matchedCap && (matchedCap.card.payment?.job_price ?? 0) === 0) return true;
+      }
+      return false;
+    });
+
+    if (pendingJobs.length === 0) return;
+
+    log(`Recovering ${pendingJobs.length} pending job(s)...`);
+
+    for (const req of pendingJobs) {
+      processedJobs.add(req.id);
+      const requestedTag = req.tags.find((t) => t[0] === "t" && t[1] !== "elisym")?.[1];
+      const matchedCap = findCap(requestedTag);
+      if (!matchedCap) continue;
+
+      const price = matchedCap.card.payment?.job_price ?? 0;
+      try {
+        await deliverResult(req, matchedCap.dTag, matchedCap.card.name, price);
+        log(`Recovered job ${req.id.slice(0, 8)}...`);
+      } catch (e) {
+        post({ type: "log", level: "error", message: `Recovery failed for ${req.id.slice(0, 8)}...: ${e}` });
+      }
+    }
+  } catch (e) {
+    post({ type: "log", level: "error", message: `Job recovery error: ${e}` });
+  }
 }
 
 // --------------- Message handler ---------------

@@ -58,18 +58,25 @@ export function OrderHistory() {
         if (eTag?.[1]) paidRequestIds.add(eTag[1]);
       }
 
-      // Only keep paid requests
-      const paidRequests = requests.filter((r) => paidRequestIds.has(r.id));
-      if (paidRequests.length === 0) return [];
-
-      const paidIds = paidRequests.map((r) => r.id);
-
-      // Fetch results for paid requests
+      // Fetch results for all requests (paid + free)
       const results = await client.pool.queryBatchedByTag(
         { kinds: [6100] } as Filter,
         "e",
-        paidIds,
+        requestIds,
       );
+
+      // Collect request IDs that have a result delivered
+      const deliveredRequestIds = new Set<string>();
+      for (const r of results) {
+        const eTag = r.tags.find((t) => t[0] === "e");
+        if (eTag?.[1]) deliveredRequestIds.add(eTag[1]);
+      }
+
+      // Keep requests that were paid OR have a result (free)
+      const completedRequests = requests.filter(
+        (r) => paidRequestIds.has(r.id) || deliveredRequestIds.has(r.id),
+      );
+      if (completedRequests.length === 0) return [];
 
       // Index results by request ID, decrypting NIP-44 if needed
       const sk = idCtx?.identity?.secretKey;
@@ -96,7 +103,7 @@ export function OrderHistory() {
         });
       }
 
-      return paidRequests
+      return completedRequests
         .sort((a, b) => b.created_at - a.created_at)
         .map((req) => {
           const capTag = req.tags.find((t) => t[0] === "t" && t[1] !== "elisym");

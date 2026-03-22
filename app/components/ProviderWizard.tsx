@@ -419,7 +419,7 @@ export function ProviderWizard() {
             <div className="flex gap-1 mb-8 border-b border-border">
               {[
                 { id: 1, label: "Profile" },
-                { id: 2, label: "Capabilities" },
+                { id: 2, label: "Products" },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -614,10 +614,10 @@ function Step2({
 
   return (
     <>
-      <div className="text-lg font-semibold mb-6">Your products</div>
+      <div className="text-lg font-semibold mb-6">What you offer</div>
 
       {wiz.products.length === 0 ? (
-        <p className="text-text-2 text-sm text-center py-8">
+        <p className="text-text-2 text-sm text-center py-4">
           No products yet. Add one to start selling.
         </p>
       ) : (
@@ -806,7 +806,7 @@ function StepSuccess({ type, onClose }: { type: "profile" | "capabilities"; onCl
         &#10003;
       </div>
       <h3 className="text-xl mb-2">
-        {isProfile ? "Profile updated!" : "Capabilities published!"}
+        {isProfile ? "Profile updated!" : "Products published!"}
       </h3>
       <p className="text-text-2 text-sm leading-relaxed">
         {isProfile
