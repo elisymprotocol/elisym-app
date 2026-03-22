@@ -218,9 +218,20 @@ export function ProviderWizard() {
         picture: avatarUrl,
       });
 
-      toast.success("Profile saved");
-      queryClient.refetchQueries({ queryKey: ["agents"] });
+      toast.success("Profile published");
       dispatch({ type: "CLOSE_WIZARD" });
+
+      // Resync from relays in background
+      const syncId = toast.loading("Syncing with relays...");
+      try {
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ["agents"] }),
+          queryClient.refetchQueries({ queryKey: ["nostr-profile", nostrPubkey] }),
+        ]);
+        toast.success("Synced with relays", { id: syncId });
+      } catch {
+        toast.error("Sync failed", { id: syncId });
+      }
     } catch (err) {
       toast.error("Failed: " + (err instanceof Error ? err.message : "Unknown error"));
     } finally {
@@ -322,9 +333,20 @@ export function ProviderWizard() {
         });
       queryClient.setQueryData(["nostr-capabilities", nostrPubkey], publishedCards);
 
-      toast.success("Capabilities saved");
-      queryClient.refetchQueries({ queryKey: ["agents"] });
+      toast.success("Capabilities published");
       dispatch({ type: "CLOSE_WIZARD" });
+
+      // Resync from relays in background
+      const syncId = toast.loading("Syncing with relays...");
+      try {
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ["agents"] }),
+          queryClient.refetchQueries({ queryKey: ["nostr-capabilities", nostrPubkey] }),
+        ]);
+        toast.success("Synced with relays", { id: syncId });
+      } catch {
+        toast.error("Sync failed", { id: syncId });
+      }
     } catch (err) {
       toast.error("Failed: " + (err instanceof Error ? err.message : "Unknown error"));
     } finally {
