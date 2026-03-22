@@ -29,9 +29,7 @@ const initialState: UIState = {
     desc: "",
     avatarFile: null,
     avatarPreview: null,
-    products: [
-      { name: "", desc: "", price: "", tags: [], photoFile: null, photoPreview: null },
-    ],
+    products: [],
   },
 };
 

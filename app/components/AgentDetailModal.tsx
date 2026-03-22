@@ -63,11 +63,10 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
           </div>
           <button
             onClick={onClose}
-            className="size-9 rounded-lg border border-border bg-surface flex items-center justify-center text-text-2 cursor-pointer hover:bg-surface-2 hover:text-text transition-colors shrink-0"
+            className="size-8 flex items-center justify-center rounded-full bg-transparent border-none text-text-2 cursor-pointer hover:bg-surface-2 hover:text-text transition-colors shrink-0"
           >
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
         </div>

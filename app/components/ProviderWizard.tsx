@@ -37,9 +37,7 @@ function getWizData(data: Record<string, unknown>) {
     desc: (data.desc as string) || "",
     avatarFile: (data.avatarFile as File | null) ?? null,
     avatarPreview: (data.avatarPreview as string | null) ?? null,
-    products: (data.products as WizProduct[]) || [
-      { name: "", desc: "", price: "", tags: [], photoFile: null, photoPreview: null, result: "" },
-    ],
+    products: (data.products as WizProduct[]) || [],
   };
 }
 
@@ -137,7 +135,7 @@ export function ProviderWizard() {
         patch.desc = "";
         patch.avatarPreview = null;
         patch.avatarFile = null;
-        patch.products = [{ name: "", desc: "", price: "", tags: [], photoFile: null, photoPreview: null, result: "" }];
+        patch.products = [];
         setRemovedDTags([]);
       }
 
@@ -397,9 +395,11 @@ export function ProviderWizard() {
           <h2 className="text-xl font-bold">Provider Settings</h2>
           <button
             onClick={() => dispatch({ type: "CLOSE_WIZARD" })}
-            className="bg-transparent border-none text-text-2 text-[22px] cursor-pointer hover:text-text"
+            className="size-8 flex items-center justify-center rounded-full bg-transparent border-none text-text-2 cursor-pointer hover:bg-surface-2 hover:text-text transition-colors"
           >
-            &#10005;
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
@@ -608,18 +608,24 @@ function Step2({
     <>
       <div className="text-lg font-semibold mb-6">Your products</div>
 
-      {wiz.products.map((p, i) => (
-        <ProductCard
-          key={i}
-          product={p}
-          index={i}
-          canRemove={wiz.products.length > 1}
-          onUpdate={updateProduct}
-          onRemove={removeProduct}
-          onPhotoChange={handleProductPhoto}
-          onSelectTag={selectTag}
-        />
-      ))}
+      {wiz.products.length === 0 ? (
+        <p className="text-text-2 text-sm text-center py-8">
+          No products yet. Add one to start selling.
+        </p>
+      ) : (
+        wiz.products.map((p, i) => (
+          <ProductCard
+            key={i}
+            product={p}
+            index={i}
+            canRemove
+            onUpdate={updateProduct}
+            onRemove={removeProduct}
+            onPhotoChange={handleProductPhoto}
+            onSelectTag={selectTag}
+          />
+        ))
+      )}
 
       <button
         onClick={addProduct}
@@ -651,13 +657,15 @@ function ProductCard({
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="p-4 bg-surface-2 rounded-xl border border-border mb-3">
+    <div className="relative p-4 bg-surface-2 rounded-xl border border-border mb-3">
       {canRemove && (
         <button
           onClick={() => onRemove(index)}
-          className="float-right bg-transparent border-none text-text-2 text-base cursor-pointer p-1 hover:text-error"
+          className="absolute -top-2.5 -right-2.5 size-7 flex items-center justify-center rounded-full bg-surface border border-border text-text-2 cursor-pointer hover:bg-red-50 hover:text-error hover:border-red-200 transition-colors shadow-sm"
         >
-          &#10005;
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
         </button>
       )}
 
