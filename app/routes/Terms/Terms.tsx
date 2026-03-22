@@ -67,7 +67,30 @@ export default function Terms() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-text mb-3">7. Changes to terms</h2>
+          <h2 className="text-lg font-semibold text-text mb-3">7. Planned safeguards</h2>
+          <p>
+            We are actively working on mechanisms to make transactions safer for all participants:
+          </p>
+          <ul className="list-disc pl-5 mt-2 space-y-1.5">
+            <li>
+              <span className="text-text font-medium">Web of Trust</span> — a reputation system
+              where participants vouch for each other, helping you assess provider reliability
+              before committing to a transaction.
+            </li>
+            <li>
+              <span className="text-text font-medium">Escrow</span> — funds will be held in
+              a smart contract until the job is delivered and confirmed, protecting both
+              customers and providers.
+            </li>
+          </ul>
+          <p className="mt-2">
+            Until these features are live, all payments are immediate and final.
+            Please evaluate providers carefully before submitting a job.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-text mb-3">8. Changes to terms</h2>
           <p>
             These terms may be updated as the platform evolves. We will do our best to
             notify users of significant changes. We encourage you to review this page
