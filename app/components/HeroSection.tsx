@@ -8,7 +8,7 @@ export function HeroSection() {
   return (
     <div className="bg-surface pb-12">
       <section className="text-center py-16 px-6 max-w-3xl mx-auto">
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-tight mb-4">
+        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-tight mb-4" style={{ fontFamily: '"Inria Serif", Georgia, serif' }}>
           Open market. Any participant.
         </h1>
         <p className="text-text-2 text-lg leading-relaxed max-w-xl mx-auto">
