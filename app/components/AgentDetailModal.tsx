@@ -3,6 +3,7 @@ import { formatSol, truncateKey } from "@elisym/sdk";
 import { track } from "~/lib/analytics";
 import type { CapabilityCard } from "@elisym/sdk";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { nip19 } from "nostr-tools";
 import { MarbleAvatar } from "./MarbleAvatar";
 import { useBuyCapability } from "~/hooks/useBuyCapability";
@@ -128,10 +129,11 @@ function CapabilityItem({
 }) {
   const price = card.payment?.job_price;
   const isStatic = card.static === true;
-  const { publicKey, select, wallets } = useWallet();
+  const { publicKey } = useWallet();
+  const { setVisible } = useWalletModal();
   const idCtx = useOptionalIdentity();
   const isOwn = idCtx?.publicKey === agentPubkey;
-  const { buy, buying, result, error } = useBuyCapability({
+  const { buy, buying, result, error, rate, rated } = useBuyCapability({
     agentPubkey,
     agentName,
     agentPicture,
@@ -144,12 +146,10 @@ function CapabilityItem({
   function handleBuy() {
     if (!publicKey) {
       track("wallet-connect", { source: "agent-modal" });
-      if (wallets.length > 0 && wallets[0]) {
-        select(wallets[0].adapter.name);
-      }
+      setVisible(true);
       return;
     }
-    track("buy", { agent: agent.name, price: price ? formatSol(price) : "free" });
+    track("buy", { agent: agentName, price: price ? formatSol(price) : "free" });
     if (isStatic) {
       buy();
     } else {
@@ -207,8 +207,28 @@ function CapabilityItem({
         {hasPurchaseAction && !isOwn && (
           <div className="mt-3">
             {result ? (
-              <div className="p-3 bg-surface rounded-lg border border-border text-xs text-text leading-relaxed whitespace-pre-wrap">
-                {result}
+              <div>
+                <div className="p-3 bg-surface rounded-lg border border-border text-xs text-text leading-relaxed whitespace-pre-wrap">
+                  {result}
+                </div>
+                {rated ? (
+                  <p className="text-[11px] text-text-2 mt-2">Thanks for your feedback</p>
+                ) : (
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => rate(true)}
+                      className="py-1 px-3 rounded-lg border border-border bg-surface text-xs text-text-2 cursor-pointer hover:border-green hover:text-green transition-colors"
+                    >
+                      👍 Good
+                    </button>
+                    <button
+                      onClick={() => rate(false)}
+                      className="py-1 px-3 rounded-lg border border-border bg-surface text-xs text-text-2 cursor-pointer hover:border-error hover:text-error transition-colors"
+                    >
+                      👎 Bad
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <>

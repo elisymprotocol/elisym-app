@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Decimal from "decimal.js-light";
-import { truncateKey, timeAgo } from "@elisym/sdk";
+import { truncateKey, timeAgo, ElisymIdentity } from "@elisym/sdk";
 import * as nip44 from "nostr-tools/nip44";
 import { useElisymClient } from "~/hooks/useElisymClient";
 import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
+import { cacheGet, cacheSet } from "~/lib/localCache";
+import { track } from "~/lib/analytics";
+import { toast } from "sonner";
 import type { Filter } from "nostr-tools";
 
 interface Order {
@@ -23,6 +26,7 @@ export function OrderHistory() {
   const pubkey = idCtx?.publicKey ?? "";
   const [syncing, setSyncing] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [ratedJobs, setRatedJobs] = useState<Set<string>>(new Set());
 
   const { data: orders, refetch } = useLocalQuery<Order[]>({
     queryKey: ["order-history", pubkey],
@@ -114,6 +118,37 @@ export function OrderHistory() {
     staleTime: 1000 * 30,
     refetchInterval: 1000 * 60,
   });
+
+  // Load rated status from IndexedDB
+  useEffect(() => {
+    if (!orders) return;
+    const completed = orders.filter((o) => o.status === "completed" && o.result);
+    Promise.all(
+      completed.map(async (o) => {
+        const isRated = await cacheGet<boolean>(`rated:${o.jobEventId}`);
+        return isRated ? o.jobEventId : null;
+      }),
+    ).then((ids) => {
+      const set = new Set(ids.filter(Boolean) as string[]);
+      if (set.size > 0) setRatedJobs(set);
+    });
+  }, [orders]);
+
+  const rateOrder = useCallback(async (jobEventId: string, providerPubkey: string, positive: boolean) => {
+    try {
+      const identity =
+        idCtx?.identity ??
+        ElisymIdentity.fromLocalStorage("elisym:identity") ??
+        ElisymIdentity.generate();
+      await client.marketplace.submitFeedback(identity, jobEventId, providerPubkey, positive);
+      setRatedJobs((prev) => new Set(prev).add(jobEventId));
+      await cacheSet(`rated:${jobEventId}`, true);
+      track("rate-result", { rating: positive ? "good" : "bad" });
+      toast.success("Feedback sent");
+    } catch {
+      toast.error("Failed to send feedback");
+    }
+  }, [client, idCtx?.identity]);
 
   async function handleResync() {
     setSyncing(true);
@@ -237,8 +272,28 @@ export function OrderHistory() {
             {expandedId === order.jobEventId && (
               <div className="px-4 pb-4 border-t border-border">
                 {order.result ? (
-                  <div className="mt-3 p-3 bg-surface rounded-lg border border-border text-xs text-text leading-relaxed whitespace-pre-wrap">
-                    {order.result}
+                  <div>
+                    <div className="mt-3 p-3 bg-surface rounded-lg border border-border text-xs text-text leading-relaxed whitespace-pre-wrap">
+                      {order.result}
+                    </div>
+                    {ratedJobs.has(order.jobEventId) ? (
+                      <p className="text-[11px] text-text-2 mt-2">Thanks for your feedback</p>
+                    ) : order.providerPubkey ? (
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => rateOrder(order.jobEventId, order.providerPubkey!, true)}
+                          className="py-1 px-3 rounded-lg border border-border bg-surface text-xs text-text-2 cursor-pointer hover:border-green hover:text-green transition-colors"
+                        >
+                          👍 Good
+                        </button>
+                        <button
+                          onClick={() => rateOrder(order.jobEventId, order.providerPubkey!, false)}
+                          className="py-1 px-3 rounded-lg border border-border bg-surface text-xs text-text-2 cursor-pointer hover:border-error hover:text-error transition-colors"
+                        >
+                          👎 Bad
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="mt-3 text-xs text-text-2">Waiting for provider response...</p>

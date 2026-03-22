@@ -11,6 +11,7 @@ import { useElisymClient } from "./useElisymClient";
 import { useOptionalIdentity } from "./useIdentity";
 import { useJobHistory } from "./useJobHistory";
 import { cacheSet } from "~/lib/localCache";
+import { track } from "~/lib/analytics";
 
 interface BuyCapabilityOptions {
   agentPubkey: string;
@@ -35,6 +36,8 @@ export function useBuyCapability({
   const [buying, setBuying] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [rated, setRated] = useState(false);
   const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -68,6 +71,7 @@ export function useBuyCapability({
         capability,
         providerPubkey: agentPubkey,
       });
+      setJobId(jobEventId);
 
       // 2. Save initial job
       saveJob({
@@ -189,5 +193,22 @@ export function useBuyCapability({
     updateJob,
   ]);
 
-  return { buy, buying, result, error };
+  const rate = useCallback(async (positive: boolean) => {
+    if (!jobId || rated) return;
+    try {
+      const identity =
+        idCtx?.identity ??
+        ElisymIdentity.fromLocalStorage("elisym:identity") ??
+        ElisymIdentity.generate();
+      await client.marketplace.submitFeedback(identity, jobId, agentPubkey, positive);
+      setRated(true);
+      await cacheSet(`rated:${jobId}`, true);
+      track("rate-result", { rating: positive ? "good" : "bad" });
+      toast.success("Feedback sent");
+    } catch {
+      toast.error("Failed to send feedback");
+    }
+  }, [jobId, rated, client, idCtx?.identity, agentPubkey]);
+
+  return { buy, buying, result, error, jobId, rate, rated };
 }
