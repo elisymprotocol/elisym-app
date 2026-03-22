@@ -83,7 +83,7 @@ export function ProviderWizard() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Fetch existing capabilities (kind:31990), deduped by actual event d-tag
+  // Subscribe to capabilities from shared query (useHeartbeat owns the queryFn)
   const { data: existingCards } = useLocalQuery<{ card: CapabilityCard; dTag: string }[]>({
     queryKey: ["nostr-capabilities", nostrPubkey],
     queryFn: async () => {
@@ -92,12 +92,14 @@ export function ProviderWizard() {
         authors: [nostrPubkey],
         "#t": ["elisym"],
       } as Filter);
+      const deletedDTags = getDeletedDTags();
       const byDTag = new Map<string, { card: CapabilityCard; dTag: string; ts: number }>();
       for (const ev of events) {
         try {
           const parsed = JSON.parse(ev.content) as CapabilityCard & { deleted?: boolean };
           if (!parsed.name || parsed.deleted) continue;
           const dTag = ev.tags.find((t: string[]) => t[0] === "d")?.[1] ?? "";
+          if (deletedDTags.has(dTag)) continue;
           const existing = byDTag.get(dTag);
           if (!existing || ev.created_at > existing.ts) {
             byDTag.set(dTag, { card: parsed, dTag, ts: ev.created_at });
@@ -110,6 +112,11 @@ export function ProviderWizard() {
     },
     enabled: !!nostrPubkey,
     staleTime: 1000 * 60 * 5,
+    cacheTransform: (data) => {
+      const deleted = getDeletedDTags();
+      if (deleted.size === 0) return data;
+      return data.filter((c) => !deleted.has(c.dTag));
+    },
   });
 
   // Reset populated ref when wizard closes so next open re-fetches from Nostr
@@ -287,7 +294,7 @@ export function ProviderWizard() {
       const buildPublishedCards = () => publishedProducts
         .map(({ p, i }) => {
           const caps = p.tags.length > 0 ? p.tags.map((t) => t.toLowerCase().replace(/[^a-z0-9-]/g, "-")) : ["general"];
-          const pr = p.price ? Math.round(parseFloat(p.price.replace(",", ".")) * 1_000_000_000) : undefined;
+          const pr = p.price ? Math.round(parseFloat(p.price.replace(",", ".")) * 1_000_000_000) : 0;
           return {
             card: {
               name: p.name, description: p.desc, capabilities: caps,
@@ -840,12 +847,12 @@ function StepSuccess({ type, onClose }: { type: "profile" | "capabilities"; onCl
         &#10003;
       </div>
       <h3 className="text-xl mb-2">
-        {isProfile ? "Profile updated!" : "Products published!"}
+        {isProfile ? "Profile updated!" : "Products updated!"}
       </h3>
       <p className="text-text-2 text-sm leading-relaxed">
         {isProfile
           ? "Your profile has been updated on the elisym network."
-          : "Your capabilities have been published to the elisym network. Customers can now discover and hire you on the elisym marketplace."}
+          : "Your products have been updated on the elisym network."}
       </p>
       <button onClick={onClose} className="btn btn-primary mt-6">
         Got it

@@ -129,6 +129,7 @@ function CapabilityItem({
 }) {
   const price = card.payment?.job_price;
   const isStatic = card.static === true;
+  console.log(`[CapabilityItem] ${card.name}: payment=${JSON.stringify(card.payment)}, price=${price}, static=${isStatic}`);
   const { publicKey } = useWallet();
   const { setVisible } = useWalletModal();
   const idCtx = useOptionalIdentity();

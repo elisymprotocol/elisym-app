@@ -13,6 +13,8 @@ import { cacheGet, cacheSet } from "~/lib/localCache";
 export function useLocalQuery<T>(
   options: UseQueryOptions<T, Error, T, string[]> & {
     queryKey: string[];
+    /** Transform cached data loaded from IndexedDB before using as initialData. */
+    cacheTransform?: (data: T) => T;
   },
 ): UseQueryResult<T, Error> & { fromCache: boolean } {
   const cacheKey = options.queryKey.join(":");
@@ -35,7 +37,7 @@ export function useLocalQuery<T>(
     cacheGet<T>(cacheKey).then((cached) => {
       if (cancelled) return;
       if (cached !== undefined) {
-        setInitialData(cached);
+        setInitialData(options.cacheTransform ? options.cacheTransform(cached) : cached);
         setFromCache(true);
         initialDataKeyRef.current = cacheKey;
       }

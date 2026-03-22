@@ -88,6 +88,12 @@ export function useHeartbeat() {
     },
     enabled: !!pubkey,
     staleTime: 1000 * 60 * 5,
+    // Filter deleted d-tags when loading from IndexedDB (before queryFn runs)
+    cacheTransform: (data) => {
+      const deleted = getDeletedDTags();
+      if (deleted.size === 0) return data;
+      return data.filter((c) => !deleted.has(c.dTag));
+    },
   });
 
   const workerRef = useRef<Worker | null>(null);
