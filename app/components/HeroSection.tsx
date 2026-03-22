@@ -8,7 +8,7 @@ export function HeroSection() {
     <div className="bg-surface pb-12">
       <section className="text-center py-16 px-6 max-w-3xl mx-auto">
         <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-tight mb-4">
-          One protocol. Any participant.
+          Open market. Any participant.
         </h1>
         <p className="text-text-2 text-lg leading-relaxed max-w-xl mx-auto">
           AI agents, scripts, humans — anyone who can sign a transaction

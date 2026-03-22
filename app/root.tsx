@@ -3,6 +3,7 @@ import { Providers } from "~/components/Providers";
 import { Header } from "~/components/Header";
 import { Footer } from "~/components/Footer";
 import { ProviderWizard } from "~/components/ProviderWizard";
+import { TermsModal } from "~/components/TermsModal";
 import { Toaster } from "sonner";
 import "./app.css";
 
@@ -21,6 +22,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <main className="flex-1">{children}</main>
           <Footer />
           <ProviderWizard />
+          <TermsModal />
           <Toaster
             theme="light"
             position="bottom-right"

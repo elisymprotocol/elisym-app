@@ -10,6 +10,12 @@ export function Footer() {
       </div>
       <div className="flex items-center gap-4">
         <a
+          href="/terms"
+          className="text-text-2 hover:text-text transition-colors text-sm"
+        >
+          Terms
+        </a>
+        <a
           href="https://github.com/elisymprotocol"
           target="_blank"
           rel="noopener noreferrer"

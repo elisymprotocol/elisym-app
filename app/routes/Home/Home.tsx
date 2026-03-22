@@ -67,7 +67,7 @@ function useBootLog(agentsLoaded: boolean, statsLoaded: boolean) {
     if (started.current) return;
     started.current = true;
 
-    push({ text: "> Initializing elisym protocol v0.1.0...", type: "info" });
+    push({ text: "> Initializing elisym market v0.1.0...", type: "info" });
 
     (async () => {
       let connected = 0;
