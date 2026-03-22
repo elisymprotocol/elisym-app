@@ -431,18 +431,18 @@ export function ProviderWizard() {
         }
       }}
     >
-      <div className="bg-surface border border-border rounded-[18px] w-[560px] max-w-[95vw] max-h-[90vh] overflow-y-auto p-8">
+      <div className="bg-surface border border-border rounded-[18px] w-[560px] max-w-[95vw] max-h-[90vh] overflow-y-auto p-8 relative">
+        <button
+          onClick={() => dispatch({ type: "CLOSE_WIZARD" })}
+          className="absolute top-4 right-4 size-8 flex items-center justify-center rounded-full bg-surface-2 border-none text-text-2 cursor-pointer hover:bg-surface-2/80 hover:text-text transition-colors z-10"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
         {/* Top */}
-        <div className="flex items-center justify-between mb-7">
+        <div className="mb-7 pr-8">
           <h2 className="text-xl font-bold">Provider Settings</h2>
-          <button
-            onClick={() => dispatch({ type: "CLOSE_WIZARD" })}
-            className="size-8 flex items-center justify-center rounded-full bg-transparent border-none text-text-2 cursor-pointer hover:bg-surface-2 hover:text-text transition-colors"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
         </div>
 
         {successType ? (

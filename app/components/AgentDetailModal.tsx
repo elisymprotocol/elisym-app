@@ -35,9 +35,17 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-surface border border-border rounded-[18px] w-[560px] max-w-[95vw] max-h-[90vh] overflow-y-auto p-8">
+      <div className="bg-surface border border-border rounded-[18px] w-[560px] max-w-[95vw] max-h-[90vh] overflow-y-auto p-8 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 size-8 flex items-center justify-center rounded-full bg-surface-2 border-none text-text-2 cursor-pointer hover:bg-surface-2/80 hover:text-text transition-colors z-10"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
         {/* Header */}
-        <div className="flex items-start justify-between mb-6 gap-3">
+        <div className="flex items-start mb-6 gap-3 pr-8">
           <div className="flex items-start gap-4 min-w-0">
             <div className="size-14 rounded-full shrink-0 overflow-hidden flex items-center justify-center">
               {agent.picture ? (
@@ -62,14 +70,6 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
               </div>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="size-8 flex items-center justify-center rounded-full bg-transparent border-none text-text-2 cursor-pointer hover:bg-surface-2 hover:text-text transition-colors shrink-0"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
         </div>
 
         {/* About */}
