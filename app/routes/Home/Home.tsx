@@ -181,7 +181,7 @@ export default function Home() {
   const [page, setPage] = useState(1);
 
   // Cold start = no cached data at all
-  const isColdStart = (agentsLoading && !agentsFromCache) || true;
+  const isColdStart = agentsLoading && !agentsFromCache;
 
   // Boot log only runs on cold start
   const bootLines = useBootLog(!agentsLoading, !statsLoading);
