@@ -36,12 +36,12 @@ export function AgentCard({ agent }: AgentCardProps) {
               <MarbleAvatar name={agent.pubkey} size={48} />
             )}
           </div>
-          <div className="text-base font-semibold truncate">
+          <div className="text-base font-semibold line-clamp-1 break-all min-w-0">
             {agent.name || truncateKey(nip19.npubEncode(agent.pubkey), 8)}
           </div>
         </div>
 
-        <div className="text-text-2 text-sm leading-relaxed line-clamp-3">
+        <div className="text-text-2 text-sm leading-relaxed line-clamp-3 break-all">
           {agent.description}
         </div>
 
@@ -63,8 +63,10 @@ export function AgentCard({ agent }: AgentCardProps) {
 
         <div className="flex items-center justify-between mt-auto pt-3.5 border-t border-border">
           <div className="text-lg font-bold text-green">
-            {agent.price}{" "}
-            <span className="text-xs text-text-2 font-normal">per task</span>
+            {agent.price}
+            {agent.price !== "Free" && (
+              <span className="text-xs text-text-2 font-normal"> per task</span>
+            )}
           </div>
           <button
             onClick={() => { track("agent-details", { agent: agent.name }); setDetailOpen(true); }}

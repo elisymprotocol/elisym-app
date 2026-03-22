@@ -49,7 +49,7 @@ function toDisplayData(agent: Agent): AgentDisplayData {
     description,
     tags: allTags,
     category: allTags[0] || "other",
-    price: price != null ? formatSol(price) : "N/A",
+    price: price != null ? (price === 0 ? "Free" : formatSol(price)) : "N/A",
     priceLamports: price,
     wallet: walletAddress ? truncateKey(walletAddress, 4) : "",
     walletAddress,

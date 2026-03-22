@@ -160,7 +160,8 @@ function CapabilityItem({
   function buttonLabel() {
     if (buying) return "Processing...";
     if (!publicKey) return "Connect Wallet";
-    return price != null ? `Buy for ${formatSol(price)}` : "Submit";
+    if (price != null) return price === 0 ? "Get for Free" : `Buy for ${formatSol(price)}`;
+    return "Submit";
   }
 
   return (
@@ -175,9 +176,9 @@ function CapabilityItem({
       )}
 
       <div className="p-4">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <div className="text-sm font-semibold">
-            {card.name.length > 100 ? card.name.slice(0, 100) + "..." : card.name}
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <div className="text-sm font-semibold line-clamp-2 break-all">
+            {card.name}
           </div>
           {price != null && (
             <div className="text-sm font-bold text-green shrink-0">
@@ -186,8 +187,8 @@ function CapabilityItem({
           )}
         </div>
         {card.description && (
-          <div className="text-xs text-text-2 leading-relaxed mb-2">
-            {card.description.length > 280 ? card.description.slice(0, 280) + "..." : card.description}
+          <div className="text-xs text-text-2 leading-relaxed mb-2 line-clamp-2 break-all">
+            {card.description}
           </div>
         )}
         {card.capabilities.length > 0 && (

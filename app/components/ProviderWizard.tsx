@@ -295,7 +295,7 @@ export function ProviderWizard() {
 
         const price = product.price
           ? Math.round(parseFloat(product.price.replace(",", ".")) * 1_000_000_000)
-          : undefined;
+          : 0;
 
         const payment = walletAddress
           ? { chain: "solana" as const, network: "devnet" as const, address: walletAddress, ...(price != null ? { job_price: price } : {}) }
