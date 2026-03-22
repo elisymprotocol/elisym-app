@@ -151,9 +151,8 @@ export function OrderHistory() {
       setRatedJobs((prev) => new Set(prev).add(jobEventId));
       await cacheSet(`rated:${jobEventId}`, true);
       track("rate-result", { rating: positive ? "good" : "bad" });
-      toast.success("Feedback sent");
     } catch {
-      toast.error("Failed to send feedback");
+      // silent fail
     }
   }, [client, idCtx?.identity]);
 
@@ -237,11 +236,11 @@ export function OrderHistory() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 max-h-[240px] overflow-y-auto min-h-0">
         {orders.map((order) => (
           <div
             key={order.jobEventId}
-            className="border border-border rounded-xl bg-surface-2 overflow-hidden"
+            className="border border-border rounded-xl bg-surface-2 overflow-hidden shrink-0"
           >
             <button
               onClick={() => setExpandedId(expandedId === order.jobEventId ? null : order.jobEventId)}

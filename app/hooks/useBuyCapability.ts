@@ -205,9 +205,8 @@ export function useBuyCapability({
       setRated(true);
       await cacheSet(`rated:${jobId}`, true);
       track("rate-result", { rating: positive ? "good" : "bad" });
-      toast.success("Feedback sent");
     } catch {
-      toast.error("Failed to send feedback");
+      // silent fail
     }
   }, [jobId, rated, client, idCtx?.identity, agentPubkey]);
 
