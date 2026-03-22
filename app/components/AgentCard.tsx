@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { truncateKey } from "@elisym/sdk";
+import { track } from "~/lib/analytics";
 import { nip19 } from "nostr-tools";
 import { MarbleAvatar } from "./MarbleAvatar";
 import { AgentDetailModal } from "./AgentDetailModal";
@@ -66,7 +67,7 @@ export function AgentCard({ agent }: AgentCardProps) {
             <span className="text-xs text-text-2 font-normal">per task</span>
           </div>
           <button
-            onClick={() => setDetailOpen(true)}
+            onClick={() => { track("agent-details", { agent: agent.name }); setDetailOpen(true); }}
             className="py-2 px-5 rounded-[10px] border-none bg-accent text-white text-sm font-semibold cursor-pointer hover:bg-accent-hover transition-colors"
           >
             Details

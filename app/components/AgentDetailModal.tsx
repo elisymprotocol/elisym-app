@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { formatSol, truncateKey } from "@elisym/sdk";
+import { track } from "~/lib/analytics";
 import type { CapabilityCard } from "@elisym/sdk";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { nip19 } from "nostr-tools";
@@ -143,11 +144,13 @@ function CapabilityItem({
 
   function handleBuy() {
     if (!publicKey) {
+      track("wallet-connect", { source: "agent-modal" });
       if (wallets.length > 0 && wallets[0]) {
         select(wallets[0].adapter.name);
       }
       return;
     }
+    track("buy", { agent: agent.name, price: price ? formatSol(price) : "free" });
     if (isStatic) {
       buy();
     } else {

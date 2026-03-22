@@ -4,6 +4,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useElisymClient } from "~/hooks/useElisymClient";
 import { ElisymIdentity, toDTag, type CapabilityCard } from "@elisym/sdk";
 import { toast } from "sonner";
+import { track } from "~/lib/analytics";
 import { useUI } from "~/contexts/UIContext";
 import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
@@ -201,6 +202,7 @@ export function ProviderWizard() {
 
   async function handleSaveProfile() {
     if (publishing) return;
+    track("publish-profile");
     setPublishing(true);
     try {
       const identity = getIdentity();
@@ -242,6 +244,7 @@ export function ProviderWizard() {
 
   async function handleSaveCapabilities() {
     if (publishing) return;
+    track("publish-capabilities", { count: wiz.products.filter((p) => p.name).length });
     setPublishing(true);
     try {
       const identity = getIdentity();

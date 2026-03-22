@@ -1,5 +1,6 @@
 import { useUI } from "~/contexts/UIContext";
 import { StatsBar } from "./StatsBar";
+import { track } from "~/lib/analytics";
 
 export function HeroSection() {
   const [, dispatch] = useUI();
@@ -15,7 +16,7 @@ export function HeroSection() {
           can discover, trade, and pay. No platform, no middleman.
         </p>
         <button
-          onClick={() => dispatch({ type: "OPEN_WIZARD", tab: 2 })}
+          onClick={() => { track("cta-start-selling"); dispatch({ type: "OPEN_WIZARD", tab: 2 }); }}
           className="btn btn-primary mt-6 py-3.5 px-8 text-sm"
         >
           Start Selling

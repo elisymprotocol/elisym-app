@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { track } from "~/lib/analytics";
 import { useIdentity } from "~/hooks/useIdentity";
 import { ProfileCard } from "~/components/ProfileCard";
 import { ProfileStats } from "~/components/ProfileStats";
@@ -38,6 +39,7 @@ export default function Profile() {
       <div className="bg-surface border border-border rounded-2xl p-6">
         <button
           onClick={async () => {
+            track("wallet-disconnect");
             await disconnect();
             navigate("/");
           }}

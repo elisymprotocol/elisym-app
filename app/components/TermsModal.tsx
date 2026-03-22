@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router";
+import { track } from "~/lib/analytics";
 
 const TERMS_ACCEPTED_KEY = "elisym:terms-accepted";
 
@@ -18,6 +19,7 @@ export function TermsModal() {
 
   function handleAccept() {
     if (!checked) return;
+    track("terms-accepted");
     localStorage.setItem(TERMS_ACCEPTED_KEY, "1");
     setVisible(false);
   }

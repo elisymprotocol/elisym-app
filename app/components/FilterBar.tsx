@@ -1,4 +1,5 @@
 import { useUI } from "~/contexts/UIContext";
+import { track } from "~/lib/analytics";
 
 export const KNOWN_CATEGORIES = ["ui-ux", "summary", "tools", "code", "data"];
 
@@ -24,7 +25,7 @@ export function FilterBar() {
         {FILTERS.map((f) => (
           <button
             key={f.key}
-            onClick={() => dispatch({ type: "SET_FILTER", filter: f.key })}
+            onClick={() => { track("filter", { category: f.key }); dispatch({ type: "SET_FILTER", filter: f.key }); }}
             className={`py-2 px-4 rounded-full border text-xs font-medium cursor-pointer transition-all ${
               state.currentFilter === f.key
                 ? "bg-accent border-accent text-white"

@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { truncateKey } from "@elisym/sdk";
 import { MarbleAvatar } from "./MarbleAvatar";
+import { track } from "~/lib/analytics";
 
 export function Header() {
   const { publicKey, select, wallets } = useWallet();
@@ -10,6 +11,7 @@ export function Header() {
   const display = address ? truncateKey(address, 4) : null;
 
   function handleSignIn() {
+    track("wallet-connect");
     if (wallets.length > 0 && wallets[0]) {
       select(wallets[0].adapter.name);
     }
