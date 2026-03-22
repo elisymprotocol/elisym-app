@@ -673,7 +673,7 @@ function ProductCard({
       <div className="mb-3">
         <div
           onClick={() => photoInputRef.current?.click()}
-          className="w-full h-32 rounded-lg bg-surface border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-accent overflow-hidden"
+          className="w-full h-64 rounded-lg bg-surface border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-accent overflow-hidden"
         >
           {product.photoPreview ? (
             <img
