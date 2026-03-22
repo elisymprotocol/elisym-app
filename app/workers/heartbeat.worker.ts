@@ -81,9 +81,11 @@ type OutMessage = LogMessage | SaleMessage;
 
 const HEARTBEAT_MS = 60_000;
 const PING_COOLDOWN_MS = 1000;
+const MAX_PROCESSED_JOBS = 1000;
 
 let client: ElisymClient | null = null;
 let identity: ElisymIdentity | null = null;
+let caps: { card: CapabilityCard; dTag: string }[] = [];
 
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 let dmSub: SubCloser | null = null;
@@ -91,6 +93,7 @@ let jobSub: SubCloser | null = null;
 const paymentSubs: SubCloser[] = [];
 const processedJobs = new Set<string>();
 const lastPings = new Map<string, number>();
+let consecutiveErrors = 0;
 
 function post(msg: OutMessage) {
   self.postMessage(msg);
@@ -100,13 +103,9 @@ function log(message: string) {
   post({ type: "log", level: "info", message });
 }
 
-// --------------- Cleanup ---------------
+// --------------- Subscriptions ---------------
 
-function cleanup() {
-  if (heartbeatInterval) {
-    clearInterval(heartbeatInterval);
-    heartbeatInterval = null;
-  }
+function closeSubs() {
   if (dmSub) {
     dmSub.close();
     dmSub = null;
@@ -117,44 +116,78 @@ function cleanup() {
   }
   for (const sub of paymentSubs) sub.close();
   paymentSubs.length = 0;
-  processedJobs.clear();
-  lastPings.clear();
-
-  if (client) {
-    client.close();
-    client = null;
-  }
-  identity = null;
 }
 
-// --------------- Start ---------------
+function findCap(tag: string | undefined) {
+  if (!tag) return caps[0];
+  const byDTag = caps.find((c) => c.dTag === tag);
+  if (byDTag) return byDTag;
+  return caps.find((c) => c.card.capabilities.includes(tag)) ?? caps[0];
+}
 
-function start(msg: StartMessage) {
-  cleanup();
+async function deliverResult(requestEvent: Event, dTag: string, capName: string, amount: number) {
+  const result = await cacheGet<string>(`capability-result:${dTag}`);
+  const content = result || "No delivery content configured.";
 
-  client = new ElisymClient();
-  identity = ElisymIdentity.fromHex(msg.secretKeyHex);
-  const caps = msg.capabilities;
+  await client!.marketplace.submitJobResult(
+    identity!,
+    requestEvent,
+    content,
+    amount > 0 ? amount : undefined,
+  );
+  log(`Delivered result for ${requestEvent.id.slice(0, 8)}...`);
+  post({ type: "sale", capabilityName: capName, amount });
+}
 
-  if (caps.length === 0) {
-    log("No capabilities — heartbeat idle");
-    return;
+async function handleJob(event: Event) {
+  if (processedJobs.has(event.id)) return;
+  processedJobs.add(event.id);
+  if (processedJobs.size > MAX_PROCESSED_JOBS) processedJobs.clear();
+
+  const requestedTag = event.tags.find((t) => t[0] === "t" && t[1] !== "elisym")?.[1];
+  const matchedCap = findCap(requestedTag);
+  if (!matchedCap) return;
+
+  const price = matchedCap.card.payment?.job_price ?? 0;
+  const walletAddress = matchedCap.card.payment?.address;
+
+  log(`Job ${event.id.slice(0, 8)}... for ${matchedCap.card.name}`);
+
+  if (price > 0 && walletAddress) {
+    const paymentRequest = PaymentService.createPaymentRequest(walletAddress, price);
+    const paymentRequestJson = JSON.stringify(paymentRequest);
+
+    await client!.marketplace.submitPaymentRequiredFeedback(
+      identity!,
+      event,
+      price,
+      paymentRequestJson,
+    );
+
+    const paymentSub = client!.pool.subscribe(
+      {
+        kinds: [7000],
+        "#e": [event.id],
+        since: Math.floor(Date.now() / 1000) - 5,
+      } as Filter,
+      async (feedbackEv) => {
+        const statusTag = feedbackEv.tags.find((t) => t[0] === "status");
+        if (statusTag?.[1] !== "payment-completed") return;
+
+        await deliverResult(event, matchedCap.dTag, matchedCap.card.name, price);
+        paymentSub.close();
+      },
+    );
+    paymentSubs.push(paymentSub);
+  } else {
+    await deliverResult(event, matchedCap.dTag, matchedCap.card.name, 0);
   }
+}
 
-  // --- Heartbeat ---
-  const lastCap = caps[caps.length - 1]!;
+function setupSubscriptions() {
+  if (!client || !identity) return;
 
-  const publishHeartbeat = () => {
-    client!.discovery
-      .publishCapability(identity!, lastCap.card)
-      .catch((e) => post({ type: "log", level: "error", message: `Heartbeat error: ${e}` }));
-  };
-
-  publishHeartbeat();
-  heartbeatInterval = setInterval(publishHeartbeat, HEARTBEAT_MS);
-  log("Heartbeat started");
-
-  // --- Ping/pong (plain ephemeral events, no encryption) ---
+  // Ping/pong responder
   dmSub = client.messaging.subscribeToPings(
     identity,
     (senderPubkey: string, nonce: string) => {
@@ -170,80 +203,87 @@ function start(msg: StartMessage) {
   );
   log("Ping responder active");
 
-  // --- Job handler ---
-  const findCap = (tag: string | undefined) => {
-    if (!tag) return caps[0];
-    // First try exact d-tag match
-    const byDTag = caps.find((c) => c.dTag === tag);
-    if (byDTag) return byDTag;
-    // Then try capability tag match
-    return caps.find((c) => c.card.capabilities.includes(tag)) ?? caps[0];
-  };
-
-  const handleJob = async (event: Event) => {
-    if (processedJobs.has(event.id)) return;
-    processedJobs.add(event.id);
-
-    const requestedTag = event.tags.find((t) => t[0] === "t" && t[1] !== "elisym")?.[1];
-    const matchedCap = findCap(requestedTag);
-    if (!matchedCap) return;
-
-    const price = matchedCap.card.payment?.job_price ?? 0;
-    const walletAddress = matchedCap.card.payment?.address;
-
-    log(`Job ${event.id.slice(0, 8)}... for ${matchedCap.card.name}`);
-
-    if (price > 0 && walletAddress) {
-      const paymentRequest = PaymentService.createPaymentRequest(walletAddress, price);
-      const paymentRequestJson = JSON.stringify(paymentRequest);
-
-      await client!.marketplace.submitPaymentRequiredFeedback(
-        identity!,
-        event,
-        price,
-        paymentRequestJson,
-      );
-
-      const paymentSub = client!.pool.subscribe(
-        {
-          kinds: [7000],
-          "#e": [event.id],
-          since: Math.floor(Date.now() / 1000) - 5,
-        } as Filter,
-        async (feedbackEv) => {
-          const statusTag = feedbackEv.tags.find((t) => t[0] === "status");
-          if (statusTag?.[1] !== "payment-completed") return;
-
-          await deliverResult(event, matchedCap.dTag, matchedCap.card.name, price);
-          paymentSub.close();
-        },
-      );
-      paymentSubs.push(paymentSub);
-    } else {
-      await deliverResult(event, matchedCap.dTag, matchedCap.card.name, 0);
-    }
-  };
-
-  const deliverResult = async (requestEvent: Event, dTag: string, capName: string, amount: number) => {
-    const result = await cacheGet<string>(`capability-result:${dTag}`);
-    const content = result || "No delivery content configured.";
-
-    await client!.marketplace.submitJobResult(
-      identity!,
-      requestEvent,
-      content,
-      amount > 0 ? amount : undefined,
-    );
-    log(`Delivered result for ${requestEvent.id.slice(0, 8)}...`);
-    post({ type: "sale", capabilityName: capName, amount });
-  };
-
+  // Job handler
   jobSub = client.marketplace.subscribeToJobRequests(
     identity,
     [5100],
     (event) => void handleJob(event),
   );
   log("Job handler active");
+}
+
+// --------------- Reconnect ---------------
+
+function restartConnection() {
+  closeSubs();
+
+  if (client) {
+    try { client.close(); } catch { /* ignore */ }
+    client = null;
+  }
+
+  client = new ElisymClient();
+  setupSubscriptions();
+  log("Reconnected to relays");
+}
+
+// --------------- Cleanup ---------------
+
+function cleanup() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+  closeSubs();
+  processedJobs.clear();
+  lastPings.clear();
+  consecutiveErrors = 0;
+
+  if (client) {
+    client.close();
+    client = null;
+  }
+  identity = null;
+  caps = [];
+}
+
+// --------------- Start ---------------
+
+function start(msg: StartMessage) {
+  cleanup();
+
+  client = new ElisymClient();
+  identity = ElisymIdentity.fromHex(msg.secretKeyHex);
+  caps = msg.capabilities;
+
+  if (caps.length === 0) {
+    log("No capabilities — heartbeat idle");
+    return;
+  }
+
+  // --- Heartbeat ---
+  const lastCap = caps[caps.length - 1]!;
+
+  const publishHeartbeat = async () => {
+    try {
+      await client!.discovery.publishCapability(identity!, lastCap.card);
+      consecutiveErrors = 0;
+    } catch (e) {
+      consecutiveErrors++;
+      post({ type: "log", level: "error", message: `Heartbeat error (${consecutiveErrors}): ${e}` });
+      if (consecutiveErrors >= 2) {
+        restartConnection();
+        consecutiveErrors = 0;
+      }
+    }
+  };
+
+  void publishHeartbeat();
+  heartbeatInterval = setInterval(() => void publishHeartbeat(), HEARTBEAT_MS);
+  log("Heartbeat started");
+
+  // --- Subscriptions ---
+  setupSubscriptions();
 }
 
 // --------------- Message handler ---------------
