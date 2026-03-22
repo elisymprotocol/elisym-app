@@ -49,7 +49,8 @@ export function useBuyCapability({
 
   const buy = useCallback(async (input = "") => {
     if (buying) return;
-    if (!publicKey) {
+    const isFree = card.payment?.job_price === 0;
+    if (!isFree && !publicKey) {
       toast.error("Connect your wallet first");
       return;
     }

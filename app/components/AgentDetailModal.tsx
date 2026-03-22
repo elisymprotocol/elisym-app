@@ -143,8 +143,10 @@ function CapabilityItem({
 
   const hasPurchaseAction = price != null;
 
+  const isFree = price === 0;
+
   function handleBuy() {
-    if (!publicKey) {
+    if (!isFree && !publicKey) {
       track("wallet-connect", { source: "agent-modal" });
       setVisible(true);
       return;
@@ -159,7 +161,7 @@ function CapabilityItem({
 
   function buttonLabel() {
     if (buying) return "Processing...";
-    if (!publicKey) return "Connect Wallet";
+    if (!isFree && !publicKey) return "Connect Wallet";
     if (price != null) return price === 0 ? "Get for Free" : `Buy for ${formatSol(price)}`;
     return "Submit";
   }
@@ -245,7 +247,7 @@ function CapabilityItem({
                   <span className="relative group">
                     <button
                       onClick={handleBuy}
-                      disabled={buying || (!!publicKey && !isStatic && !input.trim()) || (!!publicKey && pingStatus !== "online")}
+                      disabled={buying || ((!!publicKey || isFree) && !isStatic && !input.trim()) || ((!!publicKey || isFree) && pingStatus !== "online")}
                       className="py-1.5 px-4 rounded-lg bg-accent text-white text-xs font-semibold border-none cursor-pointer hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {buttonLabel()}

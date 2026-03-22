@@ -1,10 +1,12 @@
 import { useState } from "react";
 import Decimal from "decimal.js-light";
+import { useQueryClient } from "@tanstack/react-query";
 import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { useElisymClient } from "~/hooks/useElisymClient";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
 import { useUI } from "~/contexts/UIContext";
 import { track } from "~/lib/analytics";
+import type { CapabilityCard } from "@elisym/sdk";
 import type { Filter } from "nostr-tools";
 
 export function ProfileStats() {
@@ -34,6 +36,9 @@ export function ProfileStats() {
     refetchInterval: 1000 * 60,
   });
 
+  const queryClient = useQueryClient();
+  const capabilities = queryClient.getQueryData<{ card: CapabilityCard; dTag: string }[]>(["nostr-capabilities", pubkey]);
+  const hasCapabilities = (capabilities?.filter((c) => c.card.name).length ?? 0) > 0;
   const earnedSol = new Decimal(earned ?? 0).div(1e9).toFixed(2);
 
   async function handleResync() {
@@ -77,10 +82,10 @@ export function ProfileStats() {
         </button>
       </div>
       <button
-        onClick={() => { track(earned ? "cta-manage-products" : "cta-start-selling"); dispatch({ type: "OPEN_WIZARD", tab: 2 }); }}
+        onClick={() => { track(hasCapabilities ? "cta-manage-products" : "cta-start-selling"); dispatch({ type: "OPEN_WIZARD", tab: 2 }); }}
         className="btn btn-primary mt-4 py-2.5 px-6 text-sm"
       >
-        {earned ? "Manage Products" : "Start Selling"}
+        {hasCapabilities ? "Manage Products" : "Start Selling"}
       </button>
     </div>
   );
