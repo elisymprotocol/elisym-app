@@ -136,7 +136,7 @@ export function ProfileCard({ npub, pubkey, keyName }: ProfileCardProps) {
             {isLoading ? (
               <div className="h-7 w-40 bg-border rounded animate-pulse mb-1" />
             ) : (
-              <h1 className="text-2xl font-bold mb-1 truncate">{displayName}</h1>
+              <h1 className="text-2xl font-bold mb-1 line-clamp-1 break-all min-w-0">{displayName}</h1>
             )}
             <button
               onClick={() => dispatch({ type: "OPEN_WIZARD", tab: 1 })}

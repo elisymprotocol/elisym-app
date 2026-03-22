@@ -3,12 +3,15 @@ import Decimal from "decimal.js-light";
 import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { useElisymClient } from "~/hooks/useElisymClient";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
+import { useUI } from "~/contexts/UIContext";
+import { track } from "~/lib/analytics";
 import type { Filter } from "nostr-tools";
 
 export function ProfileStats() {
   const { client } = useElisymClient();
   const idCtx = useOptionalIdentity();
   const pubkey = idCtx?.publicKey ?? "";
+  const [, dispatch] = useUI();
   const [syncing, setSyncing] = useState(false);
 
   const { data: earned, refetch } = useLocalQuery<number>({
@@ -73,6 +76,12 @@ export function ProfileStats() {
           )}
         </button>
       </div>
+      <button
+        onClick={() => { track(earned ? "cta-manage-products" : "cta-start-selling"); dispatch({ type: "OPEN_WIZARD", tab: 2 }); }}
+        className="btn btn-primary mt-4 py-2.5 px-6 text-sm"
+      >
+        {earned ? "Manage Products" : "Start Selling"}
+      </button>
     </div>
   );
 }

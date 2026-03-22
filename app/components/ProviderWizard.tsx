@@ -702,7 +702,7 @@ function ProductCard({
         />
       </div>
 
-      <div className="grid grid-cols-[1fr_120px] gap-3 mb-3">
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-3 mb-3">
         <div>
           <label className="block text-[13px] font-medium text-text-2 mb-2">
             Product name

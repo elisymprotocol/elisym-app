@@ -196,13 +196,13 @@ export function useBuyCapability({
 
   const rate = useCallback(async (positive: boolean) => {
     if (!jobId || rated) return;
+    setRated(true);
     try {
       const identity =
         idCtx?.identity ??
         ElisymIdentity.fromLocalStorage("elisym:identity") ??
         ElisymIdentity.generate();
       await client.marketplace.submitFeedback(identity, jobId, agentPubkey, positive);
-      setRated(true);
       await cacheSet(`rated:${jobId}`, true);
       track("rate-result", { rating: positive ? "good" : "bad" });
     } catch {

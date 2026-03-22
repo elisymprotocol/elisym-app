@@ -142,13 +142,13 @@ export function OrderHistory() {
   }, [orders]);
 
   const rateOrder = useCallback(async (jobEventId: string, providerPubkey: string, positive: boolean) => {
+    setRatedJobs((prev) => new Set(prev).add(jobEventId));
     try {
       const identity =
         idCtx?.identity ??
         ElisymIdentity.fromLocalStorage("elisym:identity") ??
         ElisymIdentity.generate();
       await client.marketplace.submitFeedback(identity, jobEventId, providerPubkey, positive);
-      setRatedJobs((prev) => new Set(prev).add(jobEventId));
       await cacheSet(`rated:${jobEventId}`, true);
       track("rate-result", { rating: positive ? "good" : "bad" });
     } catch {
