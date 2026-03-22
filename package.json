@@ -11,7 +11,7 @@
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
-    "@elisym/sdk": "file:../elisym-sdk-ts",
+    "@elisym/sdk": "github:elisymprotocol/elisym-sdk-ts",
     "@react-router/node": "^7.13.1",
     "@solana/wallet-adapter-base": "^0.9.23",
     "@solana/wallet-adapter-react": "^0.15.35",
