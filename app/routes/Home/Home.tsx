@@ -81,7 +81,7 @@ function useBootLog(agentsLoaded: boolean, statsLoaded: boolean) {
           push({ text: `  [SKIP] ${name} — unreachable`, type: "info" });
         }
       }
-      push({ text: `  (${connected}/${RELAYS.length} relays online — ${connected >= 2 ? "sufficient" : "degraded"})`, type: connected >= 2 ? "ok" : "error" });
+      push({ text: `  (${connected}/${RELAYS.length} relays online — ${connected >= 2 ? "sufficient" : "degraded"})`, type: connected >= 2 ? "ok" : "info" });
       push(
         { text: "> Fetching NIP-90 capabilities...", type: "info" },
         { text: "  Scanning kind:31990 events across relays...", type: "info" },
