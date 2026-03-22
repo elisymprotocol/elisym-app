@@ -53,6 +53,7 @@ export function ProviderWizard() {
   const nostrPubkey = idCtx?.publicKey ?? "";
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [publishing, setPublishing] = useState(false);
+  const [successType, setSuccessType] = useState<"profile" | "capabilities" | null>(null);
   const [removedDTags, setRemovedDTags] = useState<string[]>([]);
   const populatedForPubkey = useRef<string | null>(null);
 
@@ -116,6 +117,7 @@ export function ProviderWizard() {
     if (!state.wizardOpen) {
       populatedForPubkey.current = null;
       setRemovedDTags([]);
+      setSuccessType(null);
     }
   }, [state.wizardOpen]);
 
@@ -218,8 +220,7 @@ export function ProviderWizard() {
         picture: avatarUrl,
       });
 
-      toast.success("Profile published");
-      dispatch({ type: "CLOSE_WIZARD" });
+      setSuccessType("profile");
 
       // Resync from relays in background
       const syncId = toast.loading("Syncing with relays...");
@@ -333,8 +334,7 @@ export function ProviderWizard() {
         });
       queryClient.setQueryData(["nostr-capabilities", nostrPubkey], publishedCards);
 
-      toast.success("Capabilities published");
-      dispatch({ type: "CLOSE_WIZARD" });
+      setSuccessType("capabilities");
 
       // Resync from relays in background
       const syncId = toast.loading("Syncing with relays...");
@@ -391,7 +391,7 @@ export function ProviderWizard() {
       <div className="bg-surface border border-border rounded-[18px] w-[560px] max-w-[95vw] max-h-[90vh] overflow-y-auto p-8">
         {/* Top */}
         <div className="flex items-center justify-between mb-7">
-          <h2 className="text-xl font-bold">Manage Profile</h2>
+          <h2 className="text-xl font-bold">Provider Settings</h2>
           <button
             onClick={() => dispatch({ type: "CLOSE_WIZARD" })}
             className="bg-transparent border-none text-text-2 text-[22px] cursor-pointer hover:text-text"
@@ -400,53 +400,59 @@ export function ProviderWizard() {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-8 border-b border-border">
-          {[
-            { id: 1, label: "Profile" },
-            { id: 2, label: "Capabilities" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => dispatch({ type: "SET_WIZARD_STEP", step: tab.id })}
-              className={`py-2.5 px-5 text-sm font-medium border-b-2 transition-colors bg-transparent cursor-pointer ${
-                step === tab.id
-                  ? "border-accent text-accent"
-                  : "border-transparent text-text-2 hover:text-text"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {successType ? (
+          <StepSuccess type={successType} onClose={() => { setSuccessType(null); dispatch({ type: "CLOSE_WIZARD" }); }} />
+        ) : (
+          <>
+            {/* Tabs */}
+            <div className="flex gap-1 mb-8 border-b border-border">
+              {[
+                { id: 1, label: "Profile" },
+                { id: 2, label: "Capabilities" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => dispatch({ type: "SET_WIZARD_STEP", step: tab.id })}
+                  className={`py-2.5 px-5 text-sm font-medium border-b-2 transition-colors bg-transparent cursor-pointer ${
+                    step === tab.id
+                      ? "border-accent text-accent"
+                      : "border-transparent text-text-2 hover:text-text"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-        {/* Tab content */}
-        {step === 1 && (
-          <Step1
-            wiz={wiz}
-            updateData={updateData}
-            avatarInputRef={avatarInputRef}
-            onAvatarUpload={handleAvatarUpload}
-          />
+            {/* Tab content */}
+            {step === 1 && (
+              <Step1
+                wiz={wiz}
+                updateData={updateData}
+                avatarInputRef={avatarInputRef}
+                onAvatarUpload={handleAvatarUpload}
+              />
+            )}
+            {step === 2 && <Step2 wiz={wiz} updateData={updateData} onTrackRemoval={(name) => setRemovedDTags((prev) => [...prev, name])} />}
+
+            {/* Footer */}
+            <div className="flex justify-end items-center gap-3 mt-8 pt-5 border-t border-border">
+              <button
+                onClick={() => dispatch({ type: "CLOSE_WIZARD" })}
+                className="py-3 px-7 rounded-[10px] border border-border bg-transparent text-text-2 text-sm font-semibold cursor-pointer hover:border-text-2 hover:text-text"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={publishing}
+                className="py-3 px-7 rounded-[10px] border-none bg-accent text-white text-sm font-semibold cursor-pointer hover:bg-accent-hover disabled:opacity-50"
+              >
+                {publishing ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </>
         )}
-        {step === 2 && <Step2 wiz={wiz} updateData={updateData} onTrackRemoval={(name) => setRemovedDTags((prev) => [...prev, name])} />}
-
-        {/* Footer */}
-        <div className="flex justify-end items-center gap-3 mt-8 pt-5 border-t border-border">
-          <button
-            onClick={() => dispatch({ type: "CLOSE_WIZARD" })}
-            className="py-3 px-7 rounded-[10px] border border-border bg-transparent text-text-2 text-sm font-semibold cursor-pointer hover:border-text-2 hover:text-text"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={publishing}
-            className="py-3 px-7 rounded-[10px] border-none bg-accent text-white text-sm font-semibold cursor-pointer hover:bg-accent-hover disabled:opacity-50"
-          >
-            {publishing ? "Saving..." : "Save"}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -769,6 +775,28 @@ function ProductCard({
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function StepSuccess({ type, onClose }: { type: "profile" | "capabilities"; onClose: () => void }) {
+  const isProfile = type === "profile";
+  return (
+    <div className="text-center py-5">
+      <div className="w-[72px] h-[72px] rounded-full bg-green/15 flex items-center justify-center mx-auto mb-5 text-[32px]">
+        &#10003;
+      </div>
+      <h3 className="text-xl mb-2">
+        {isProfile ? "Profile updated!" : "Capabilities published!"}
+      </h3>
+      <p className="text-text-2 text-sm leading-relaxed">
+        {isProfile
+          ? "Your profile has been updated on the elisym network."
+          : "Your capabilities have been published to the elisym network. Customers can now discover and hire you on the elisym marketplace."}
+      </p>
+      <button onClick={onClose} className="btn btn-primary mt-6">
+        Go to Marketplace
+      </button>
     </div>
   );
 }
