@@ -1,5 +1,7 @@
 import { useUI } from "~/contexts/UIContext";
 import { useOptionalIdentity } from "~/hooks/useIdentity";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { CapabilityCard } from "@elisym/sdk";
 import { StatsBar } from "./StatsBar";
@@ -7,6 +9,8 @@ import { track } from "~/lib/analytics";
 
 export function HeroSection() {
   const [, dispatch] = useUI();
+  const { publicKey } = useWallet();
+  const { setVisible } = useWalletModal();
   const idCtx = useOptionalIdentity();
   const pubkey = idCtx?.publicKey ?? "";
   const queryClient = useQueryClient();
@@ -31,10 +35,14 @@ export function HeroSection() {
         )}
         <div className="flex items-center justify-center gap-4 mt-6">
           <button
-            onClick={() => { track(activeCards.length > 0 ? "cta-manage-products" : "cta-start-selling"); dispatch({ type: "OPEN_WIZARD", tab: 2 }); }}
+            onClick={() => {
+              if (!publicKey) { track("cta-connect-wallet"); setVisible(true); return; }
+              track(activeCards.length > 0 ? "cta-manage-products" : "cta-start-selling");
+              dispatch({ type: "OPEN_WIZARD", tab: 2 });
+            }}
             className="btn btn-primary py-3.5 px-8 text-sm"
           >
-            {activeCards.length > 0 ? "Manage Products" : "Start Selling"}
+            {!publicKey ? "Connect Wallet" : activeCards.length > 0 ? "Manage Products" : "Start Selling"}
           </button>
           <a
             href="https://github.com/elisymprotocol/elisym-client/blob/main/GUIDE.md"
