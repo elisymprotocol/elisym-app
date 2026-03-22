@@ -3,12 +3,14 @@ import {
   useContext,
   useMemo,
   useEffect,
+  useState,
   type ReactNode,
 } from "react";
 import { ElisymClient, type ElisymClientConfig } from "@elisym/sdk";
 
 interface ElisymClientContextValue {
   client: ElisymClient;
+  relaysConnected: boolean;
 }
 
 const ElisymClientContext = createContext<ElisymClientContextValue | null>(null);
@@ -21,11 +23,17 @@ export function ElisymProvider({
   children: ReactNode;
 }) {
   const client = useMemo(() => new ElisymClient(config), []);
+  const [relaysConnected, setRelaysConnected] = useState(false);
 
-  useEffect(() => () => client.close(), [client]);
+  useEffect(() => {
+    client.pool.querySync({ kinds: [0], limit: 1 }).then(() => {
+      setRelaysConnected(true);
+    });
+    return () => client.close();
+  }, [client]);
 
   return (
-    <ElisymClientContext.Provider value={{ client }}>
+    <ElisymClientContext.Provider value={{ client, relaysConnected }}>
       {children}
     </ElisymClientContext.Provider>
   );

@@ -9,6 +9,7 @@ import { MarbleAvatar } from "./MarbleAvatar";
 import { useBuyCapability } from "~/hooks/useBuyCapability";
 import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { usePingAgent, type PingStatus } from "~/hooks/usePingAgent";
+import { useElisymClient } from "~/hooks/useElisymClient";
 import type { AgentDisplayData } from "~/hooks/useAgentDisplay";
 
 interface AgentDetailModalProps {
@@ -132,6 +133,7 @@ function CapabilityItem({
   console.log(`[CapabilityItem] ${card.name}: payment=${JSON.stringify(card.payment)}, price=${price}, static=${isStatic}`);
   const { publicKey } = useWallet();
   const { setVisible } = useWalletModal();
+  const { relaysConnected } = useElisymClient();
   const idCtx = useOptionalIdentity();
   const isOwn = idCtx?.publicKey === agentPubkey;
   const { buy, buying, result, error, rate, rated } = useBuyCapability({
@@ -248,12 +250,18 @@ function CapabilityItem({
                   <span className="relative group">
                     <button
                       onClick={handleBuy}
-                      disabled={buying || ((!!publicKey || isFree) && !isStatic && !input.trim()) || ((!!publicKey || isFree) && pingStatus !== "online")}
+                      disabled={buying || !relaysConnected || ((!!publicKey || isFree) && !isStatic && !input.trim()) || ((!!publicKey || isFree) && pingStatus !== "online")}
                       className="py-1.5 px-4 rounded-lg bg-accent text-white text-xs font-semibold border-none cursor-pointer hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {buttonLabel()}
                     </button>
-                    {!!publicKey && pingStatus !== "online" && !buying && (
+                    {!relaysConnected && !buying && (
+                      <span className="absolute left-full top-1/2 -translate-y-1/2 ml-2 rounded-lg bg-[#1a1a2e] px-3 py-2 text-xs text-gray-100 leading-relaxed shadow-lg z-50 pointer-events-none whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                        Connecting to relays...
+                        <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-[#1a1a2e]" />
+                      </span>
+                    )}
+                    {relaysConnected && !!publicKey && pingStatus !== "online" && !buying && (
                       <span className="absolute left-full top-1/2 -translate-y-1/2 ml-2 rounded-lg bg-[#1a1a2e] px-3 py-2 text-xs text-gray-100 leading-relaxed shadow-lg z-50 pointer-events-none whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
                         {pingStatus === "pinging" ? "Checking..." : "Provider is offline"}
                         <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-[#1a1a2e]" />
