@@ -49,11 +49,11 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
               )}
             </div>
             <div className="min-w-0">
-              <h2 className="text-xl font-bold flex items-center gap-2">
+              <h2 className="text-xl font-bold flex items-start gap-2">
                 <span>
                   {(() => { const n = agent.name || truncateKey(nip19.npubEncode(agent.pubkey), 8); return n.length > 100 ? n.slice(0, 100) + "..." : n; })()}
                 </span>
-                <span className={`size-2.5 rounded-full shrink-0 ${STATUS_DOT[pingStatus]}`} />
+                <span className={`size-2.5 rounded-full shrink-0 mt-2 ${STATUS_DOT[pingStatus]}`} />
               </h2>
               <div className="font-mono text-xs text-text-2 mt-0.5">
                 {truncateKey(nip19.npubEncode(agent.pubkey))}
@@ -62,9 +62,12 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
           </div>
           <button
             onClick={onClose}
-            className="bg-transparent border-none text-text-2 text-[22px] cursor-pointer hover:text-text"
+            className="size-9 rounded-lg border border-border bg-surface flex items-center justify-center text-text-2 cursor-pointer hover:bg-surface-2 hover:text-text transition-colors shrink-0"
           >
-            &#10005;
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
 
@@ -125,7 +128,7 @@ function CapabilityItem({
 }) {
   const price = card.payment?.job_price;
   const isStatic = card.static === true;
-  const { publicKey } = useWallet();
+  const { publicKey, select, wallets } = useWallet();
   const idCtx = useOptionalIdentity();
   const isOwn = idCtx?.publicKey === agentPubkey;
   const { buy, buying, result, error } = useBuyCapability({
@@ -139,6 +142,12 @@ function CapabilityItem({
   const hasPurchaseAction = price != null;
 
   function handleBuy() {
+    if (!publicKey) {
+      if (wallets.length > 0 && wallets[0]) {
+        select(wallets[0].adapter.name);
+      }
+      return;
+    }
     if (isStatic) {
       buy();
     } else {
@@ -159,7 +168,7 @@ function CapabilityItem({
         <img
           src={card.image}
           alt={card.name}
-          className="w-full h-48 object-cover"
+          className="w-full h-96 object-cover"
         />
       )}
 
@@ -210,13 +219,21 @@ function CapabilityItem({
                   />
                 )}
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleBuy}
-                    disabled={buying || !publicKey || (!isStatic && !input.trim()) || pingStatus !== "online"}
-                    className="py-1.5 px-4 rounded-lg bg-accent text-white text-xs font-semibold border-none cursor-pointer hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {buttonLabel()}
-                  </button>
+                  <span className="relative group">
+                    <button
+                      onClick={handleBuy}
+                      disabled={buying || (!!publicKey && !isStatic && !input.trim()) || (!!publicKey && pingStatus !== "online")}
+                      className="py-1.5 px-4 rounded-lg bg-accent text-white text-xs font-semibold border-none cursor-pointer hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {buttonLabel()}
+                    </button>
+                    {!!publicKey && pingStatus !== "online" && !buying && (
+                      <span className="absolute left-full top-1/2 -translate-y-1/2 ml-2 rounded-lg bg-[#1a1a2e] px-3 py-2 text-xs text-gray-100 leading-relaxed shadow-lg z-50 pointer-events-none whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                        {pingStatus === "pinging" ? "Checking..." : "Provider is offline"}
+                        <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-[#1a1a2e]" />
+                      </span>
+                    )}
+                  </span>
                   {error && (
                     <span className="text-xs text-error truncate">{error}</span>
                   )}

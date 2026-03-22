@@ -37,9 +37,9 @@ export default function Profile() {
 
       <div className="bg-surface border border-border rounded-2xl p-6">
         <button
-          onClick={() => {
-            void disconnect();
-            void navigate("/");
+          onClick={async () => {
+            await disconnect();
+            navigate("/");
           }}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-error/20 bg-error/5 text-error text-sm font-medium cursor-pointer hover:bg-error/10 transition-colors"
         >

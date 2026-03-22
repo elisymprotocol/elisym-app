@@ -43,7 +43,7 @@ export function Header() {
             onClick={() => void handleSignIn()}
             className="btn btn-outline"
           >
-            Sign in
+            Connect Wallet
           </button>
         )}
       </div>

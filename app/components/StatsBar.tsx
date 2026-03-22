@@ -51,7 +51,7 @@ export function StatsBar() {
               {data?.totalAgentCount ?? "—"}
             </div>
             <div className="text-[11px] text-text-2 mt-0.5">
-              NIP-90 Agents
+              Elisym Agents
               <InfoTooltip text={TOOLTIP} />
             </div>
           </div>
