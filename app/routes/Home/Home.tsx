@@ -136,13 +136,13 @@ function BootLog({ lines }: { lines: LogLine[] }) {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
-      <div className="w-full bg-[#0d0f14] rounded-xl border border-[#1e2330] overflow-hidden shadow-lg">
+      <div className="w-full bg-[#f5f3f0] rounded-xl border border-[#e0dbd5] overflow-hidden shadow-sm">
         {/* Title bar */}
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-[#131620] border-b border-[#1e2330]">
-          <div className="size-3 rounded-full bg-[#ff5f57]" />
-          <div className="size-3 rounded-full bg-[#fdbc40]" />
-          <div className="size-3 rounded-full bg-[#28c840]" />
-          <span className="ml-2 text-[11px] text-[#4a5068] font-mono">elisym — boot</span>
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-[#ece8e3] border-b border-[#e0dbd5]">
+          <div className="size-3 rounded-full bg-[#f4a5a0]" />
+          <div className="size-3 rounded-full bg-[#f2d48f]" />
+          <div className="size-3 rounded-full bg-[#a3d9a5]" />
+          <span className="ml-2 text-[11px] text-[#a09888] font-mono">elisym — boot</span>
         </div>
         {/* Log body */}
         <div ref={containerRef} className="p-5 font-mono text-[13px] leading-6 max-h-80 overflow-y-auto">
@@ -151,19 +151,19 @@ function BootLog({ lines }: { lines: LogLine[] }) {
               key={i}
               className={`animate-[fadeIn_0.2s_ease-out] ${
                 line.type === "ok"
-                  ? "text-emerald-400"
+                  ? "text-[#5a9e6f]"
                   : line.type === "error"
-                    ? "text-red-400"
+                    ? "text-[#c97067]"
                     : line.type === "comment"
-                      ? "text-[#4a5068] italic"
-                      : "text-[#8b93ad]"
+                      ? "text-[#b8ad9e] italic"
+                      : "text-[#6b6356]"
               }`}
             >
               {line.text}
             </div>
           ))}
           {!isComplete && (
-            <span className="inline-block w-2 h-4 bg-emerald-400 animate-pulse ml-0.5 align-middle" />
+            <span className="inline-block w-2 h-4 bg-[#5a9e6f] animate-pulse ml-0.5 align-middle" />
           )}
         </div>
       </div>
@@ -181,7 +181,7 @@ export default function Home() {
   const [page, setPage] = useState(1);
 
   // Cold start = no cached data at all
-  const isColdStart = agentsLoading && !agentsFromCache;
+  const isColdStart = (agentsLoading && !agentsFromCache) || true;
 
   // Boot log only runs on cold start
   const bootLines = useBootLog(!agentsLoading, !statsLoading);
