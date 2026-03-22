@@ -795,7 +795,7 @@ function StepSuccess({ type, onClose }: { type: "profile" | "capabilities"; onCl
           : "Your capabilities have been published to the elisym network. Customers can now discover and hire you on the elisym marketplace."}
       </p>
       <button onClick={onClose} className="btn btn-primary mt-6">
-        Go to Marketplace
+        Got it
       </button>
     </div>
   );

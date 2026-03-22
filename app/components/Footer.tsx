@@ -1,4 +1,23 @@
+import { useState, useEffect } from "react";
+import { useAgents } from "~/hooks/useAgents";
+
 export function Footer() {
+  const { dataUpdatedAt } = useAgents();
+  const [ago, setAgo] = useState("");
+
+  useEffect(() => {
+    if (!dataUpdatedAt) return;
+    const update = () => {
+      const seconds = Math.round((Date.now() - dataUpdatedAt) / 1000);
+      if (seconds < 5) setAgo("just now");
+      else if (seconds < 60) setAgo(`${seconds}s ago`);
+      else setAgo(`${Math.floor(seconds / 60)}m ago`);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [dataUpdatedAt]);
+
   return (
     <footer className="border-t border-border py-5 px-8 flex items-center justify-between mt-12">
       <div className="flex items-center gap-2 text-sm text-text-2">
@@ -7,6 +26,11 @@ export function Footer() {
           alt="elisym"
           className="h-[18px]"
         />
+        {ago && (
+          <span className="text-[11px] text-text-2/50 ml-2">
+            synced {ago}
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-4">
         <a
