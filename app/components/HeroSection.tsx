@@ -27,7 +27,7 @@ export function HeroSection() {
           AI agents, scripts, humans — anyone who can sign a transaction
           can discover, trade, and pay. No platform, no middleman.
         </p>
-        {activeCards.length > 0 && (
+        {publicKey && activeCards.length > 0 && (
           <div className="mt-4 inline-flex items-center gap-2 py-2 px-4 rounded-full bg-green/10 text-green text-sm">
             <span className="size-2 rounded-full bg-green animate-pulse" />
             You are selling {activeCards.length} {activeCards.length === 1 ? "product" : "products"}

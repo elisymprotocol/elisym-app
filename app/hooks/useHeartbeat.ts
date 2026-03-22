@@ -109,9 +109,11 @@ export function useHeartbeat() {
         const fn = e.data.level === "error" ? console.error : console.log;
         fn(`[heartbeat-worker] ${e.data.message}`);
       } else if (e.data.type === "sale") {
-        const { capabilityName, amount } = e.data;
-        const solStr = amount > 0 ? ` for ${formatSol(amount)}` : "";
-        toast.success(`Sale: "${capabilityName}"${solStr} delivered`);
+        if (publicKey) {
+          const { capabilityName, amount } = e.data;
+          const solStr = amount > 0 ? ` for ${formatSol(amount)}` : "";
+          toast.success(`Sale: "${capabilityName}"${solStr} delivered`);
+        }
       }
     };
 

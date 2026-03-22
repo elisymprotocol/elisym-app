@@ -4,9 +4,10 @@ import { useElisymClient } from "./useElisymClient";
 export type PingStatus = "pinging" | "online" | "offline";
 
 /**
- * Pings an agent on mount.
+ * Pings an agent on mount with automatic retry.
  * - Starts as "pinging" (yellow)
- * - After 5s timeout → "offline" (red)
+ * - If first ping fails, retries after 1.5s (pool connections may not be ready yet)
+ * - After 8s total timeout → "offline" (red)
  * - If pong arrives (even after timeout) → "online" (green)
  */
 export function usePingAgent(agentPubkey: string) {
@@ -17,26 +18,45 @@ export function usePingAgent(agentPubkey: string) {
     if (!agentPubkey) return;
     setStatus("pinging");
 
-    let timeoutFired = false;
-    const timer = setTimeout(() => {
-      timeoutFired = true;
-      setStatus((prev) => (prev === "pinging" ? "offline" : prev));
-    }, 5000);
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-    client.messaging
-      .pingAgent(agentPubkey, 30_000) // long SDK timeout — we handle 5s ourselves
-      .then(({ online }) => {
-        if (online) {
-          setStatus("online");
-        } else if (!timeoutFired) {
-          setStatus("offline");
-        }
-      })
-      .catch(() => {
-        if (!timeoutFired) setStatus("offline");
-      });
+    const ping = (attempt: number) => {
+      console.log(`[usePingAgent] attempt ${attempt} for ${agentPubkey.slice(0, 8)}`);
+      client.messaging
+        .pingAgent(agentPubkey, 5_000)
+        .then(({ online }) => {
+          if (cancelled) return;
+          console.log(`[usePingAgent] attempt ${attempt} result: ${online ? "online" : "offline"}`);
+          if (online) {
+            setStatus("online");
+          } else if (attempt < 2) {
+            retryTimer = setTimeout(() => {
+              if (!cancelled) ping(attempt + 1);
+            }, 1500);
+          } else {
+            setStatus("offline");
+          }
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          console.error(`[usePingAgent] attempt ${attempt} error:`, err);
+          if (attempt < 2) {
+            retryTimer = setTimeout(() => {
+              if (!cancelled) ping(attempt + 1);
+            }, 1500);
+          } else {
+            setStatus("offline");
+          }
+        });
+    };
 
-    return () => clearTimeout(timer);
+    ping(1);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [agentPubkey, client]);
 
   return status;

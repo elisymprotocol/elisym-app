@@ -194,12 +194,17 @@ function setupSubscriptions() {
     (senderPubkey: string, nonce: string) => {
       const now = Date.now();
       const last = lastPings.get(senderPubkey) ?? 0;
-      if (now - last < PING_COOLDOWN_MS) return;
+      if (now - last < PING_COOLDOWN_MS) {
+        log(`Ping from ${senderPubkey.slice(0, 8)} throttled (cooldown)`);
+        return;
+      }
       lastPings.set(senderPubkey, now);
 
+      log(`← Ping received from ${senderPubkey.slice(0, 8)} nonce=${nonce.slice(0, 8)}`);
       client!.messaging
         .sendPong(identity!, senderPubkey, nonce)
-        .catch(console.error);
+        .then(() => log(`→ Pong sent to ${senderPubkey.slice(0, 8)} nonce=${nonce.slice(0, 8)}`))
+        .catch((err) => log(`✗ Pong failed to ${senderPubkey.slice(0, 8)}: ${err}`));
     },
   );
   log("Ping responder active");
