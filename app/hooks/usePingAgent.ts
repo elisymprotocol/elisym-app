@@ -6,12 +6,12 @@ export type PingStatus = "pinging" | "online" | "offline";
 /**
  * Pings an agent on mount with automatic retry.
  * - Starts as "pinging" (yellow)
- * - If first ping fails, retries after 1.5s (pool connections may not be ready yet)
- * - After 8s total timeout → "offline" (red)
+ * - Probes pool health before first ping, resets if dead
+ * - Up to 3 attempts with 1.5s between retries
  * - If pong arrives (even after timeout) → "online" (green)
  */
 export function usePingAgent(agentPubkey: string) {
-  const { client } = useElisymClient();
+  const { client, resetPool } = useElisymClient();
   const [status, setStatus] = useState<PingStatus>("pinging");
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export function usePingAgent(agentPubkey: string) {
           console.log(`[usePingAgent] attempt ${attempt} result: ${online ? "online" : "offline"}`);
           if (online) {
             setStatus("online");
-          } else if (attempt < 2) {
+          } else if (attempt < 3) {
             retryTimer = setTimeout(() => {
               if (!cancelled) ping(attempt + 1);
             }, 1500);
@@ -41,7 +41,7 @@ export function usePingAgent(agentPubkey: string) {
         .catch((err) => {
           if (cancelled) return;
           console.error(`[usePingAgent] attempt ${attempt} error:`, err);
-          if (attempt < 2) {
+          if (attempt < 3) {
             retryTimer = setTimeout(() => {
               if (!cancelled) ping(attempt + 1);
             }, 1500);
@@ -51,7 +51,15 @@ export function usePingAgent(agentPubkey: string) {
         });
     };
 
-    ping(1);
+    // Probe pool health before first ping, reset if dead
+    client.pool.probe(3_000).then((ok) => {
+      if (cancelled) return;
+      if (!ok) {
+        console.log("[usePingAgent] pool probe failed, resetting");
+        resetPool();
+      }
+      ping(1);
+    });
 
     return () => {
       cancelled = true;

@@ -171,6 +171,14 @@ export function useHeartbeat() {
       }
     };
 
+    worker.onerror = (event) => {
+      console.error("[heartbeat-worker] crashed:", event.message);
+      worker.terminate();
+      workerRef.current = null;
+      // Trigger effect re-run to respawn worker
+      setCapsTrigger((v) => v + 1);
+    };
+
     worker.postMessage({
       type: "start",
       secretKeyHex,
@@ -191,9 +199,12 @@ export function useHeartbeat() {
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);
-      worker.postMessage({ type: "stop" });
-      worker.terminate();
-      workerRef.current = null;
+      // Worker may already be terminated by onerror handler
+      if (workerRef.current === worker) {
+        worker.postMessage({ type: "stop" });
+        worker.terminate();
+        workerRef.current = null;
+      }
     };
   }, [identity, capabilities, walletAddress, capsTrigger]);
 }
