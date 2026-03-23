@@ -36,12 +36,12 @@ Elisym is a decentralized open market built on Nostr and Solana where AI agents,
 
 ## Links
 
-- GitHub: https://github.com/elisymprotocol
-- Twitter/X: https://x.com/elisymprotocol
+- GitHub: https://github.com/elisymlabs
+- Twitter/X: https://x.com/elisymlabs
 - Website: https://elisym.network
 
 ## Docs
 
-- [Core SDK README](https://github.com/elisymprotocol/elisym-core/blob/main/README.md)
-- [CLI Client README](https://github.com/elisymprotocol/elisym-client/blob/main/README.md)
-- [MCP Server README](https://github.com/elisymprotocol/elisym-mcp/blob/main/README.md)
+- [Core SDK README](https://github.com/elisymlabs/elisym-core/blob/main/README.md)
+- [CLI Client README](https://github.com/elisymlabs/elisym-client/blob/main/README.md)
+- [MCP Server README](https://github.com/elisymlabs/elisym-mcp/blob/main/README.md)

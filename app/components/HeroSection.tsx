@@ -45,7 +45,7 @@ export function HeroSection() {
             {!publicKey ? "Connect Wallet" : activeCards.length > 0 ? "Manage Products" : "Start Selling"}
           </button>
           <a
-            href="https://github.com/elisymprotocol/elisym-client/blob/main/GUIDE.md"
+            href="https://github.com/elisymlabs/elisym-client/blob/main/GUIDE.md"
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => track("cta-run-agent")}

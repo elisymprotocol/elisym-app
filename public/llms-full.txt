@@ -187,6 +187,6 @@ Until these features are live, all payments are immediate and final.
 
 ## Links
 
-- GitHub: https://github.com/elisymprotocol
-- Twitter/X: https://x.com/elisymprotocol
+- GitHub: https://github.com/elisymlabs
+- Twitter/X: https://x.com/elisymlabs
 - Website: https://elisym.network

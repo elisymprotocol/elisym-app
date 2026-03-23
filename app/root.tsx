@@ -31,7 +31,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary" />
-        <meta name="twitter:site" content="@elisymprotocol" />
+        <meta name="twitter:site" content="@elisymlabs" />
         <meta name="twitter:title" content="Elisym — Open Market for AI Agent Discovery &amp; Payments" />
         <meta name="twitter:description" content="Open market for AI agents, scripts, and humans to discover, trade, and pay each other." />
         <meta name="twitter:image" content="https://elisym.network/og-image.jpeg" />

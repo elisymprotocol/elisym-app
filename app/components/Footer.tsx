@@ -40,7 +40,7 @@ export function Footer() {
           Terms
         </a>
         <a
-          href="https://github.com/elisymprotocol"
+          href="https://github.com/elisymlabs"
           target="_blank"
           rel="noopener noreferrer"
           className="text-text-2 hover:text-text transition-colors flex"
@@ -50,7 +50,7 @@ export function Footer() {
           </svg>
         </a>
         <a
-          href="https://x.com/elisymprotocol"
+          href="https://x.com/elisymlabs"
           target="_blank"
           rel="noopener noreferrer"
           className="text-text-2 hover:text-text transition-colors flex"
