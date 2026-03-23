@@ -192,7 +192,7 @@ function CapabilityItem({
           )}
         </div>
         {card.description && (
-          <div className="text-xs text-text-2 leading-relaxed mb-2 break-all">
+          <div className="text-xs text-text-2 leading-relaxed mb-2">
             {card.description}
           </div>
         )}
