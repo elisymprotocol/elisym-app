@@ -176,7 +176,7 @@ function CapabilityItem({
         <img
           src={card.image}
           alt={card.name}
-          className="w-full h-80 object-cover"
+          className="w-full h-64 object-cover"
         />
       )}
 
