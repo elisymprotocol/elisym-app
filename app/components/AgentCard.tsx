@@ -41,7 +41,7 @@ export function AgentCard({ agent }: AgentCardProps) {
           </div>
         </div>
 
-        <div className="text-text-2 text-sm leading-relaxed line-clamp-3 break-all">
+        <div className="text-text-2 text-sm leading-relaxed">
           {agent.description}
         </div>
 
