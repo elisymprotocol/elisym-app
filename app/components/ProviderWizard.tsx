@@ -10,7 +10,7 @@ import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
 import { uploadToNostrBuild } from "~/lib/uploadImage";
 import { cacheGet, cacheSet, cacheDel } from "~/lib/localCache";
-import { addDeletedDTags, removeDeletedDTags } from "~/hooks/useHeartbeat";
+import { addDeletedDTags, removeDeletedDTags, CAPABILITIES_CHANGED_EVENT } from "~/hooks/useHeartbeat";
 import type { Filter } from "nostr-tools";
 
 interface NostrProfile {
@@ -385,6 +385,11 @@ export function ProviderWizard() {
       const publishedCards = buildPublishedCards();
       queryClient.setQueryData(["nostr-capabilities", nostrPubkey], publishedCards);
       await cacheSet(`nostr-capabilities:${nostrPubkey}`, publishedCards);
+
+      // Notify heartbeat to restart (covers the case where setQueryData
+      // observer notification doesn't trigger a re-render in time,
+      // e.g. when going from 0 → 1 products)
+      window.dispatchEvent(new Event(CAPABILITIES_CHANGED_EVENT));
 
       setSuccessType("capabilities");
 

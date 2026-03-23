@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOptionalIdentity } from "./useIdentity";
 import { useElisymClient } from "./useElisymClient";
 import { useLocalQuery } from "./useLocalQuery";
@@ -7,6 +7,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { formatSol, type CapabilityCard } from "@elisym/sdk";
 import { toast } from "sonner";
 import type { Filter } from "nostr-tools";
+
+export const CAPABILITIES_CHANGED_EVENT = "elisym:capabilities-changed";
 
 const DELETED_DTAGS_KEY = "elisym:deleted-dtags";
 
@@ -98,6 +100,16 @@ export function useHeartbeat() {
 
   const workerRef = useRef<Worker | null>(null);
 
+  // Listen for explicit capability changes (e.g. first product created)
+  // to ensure the effect re-runs even if React Query's setQueryData
+  // notification doesn't trigger a re-render in time.
+  const [capsTrigger, setCapsTrigger] = useState(0);
+  useEffect(() => {
+    const handler = () => setCapsTrigger((v) => v + 1);
+    window.addEventListener(CAPABILITIES_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(CAPABILITIES_CHANGED_EVENT, handler);
+  }, []);
+
   useEffect(() => {
     // Stop previous worker
     if (workerRef.current) {
@@ -167,10 +179,21 @@ export function useHeartbeat() {
 
     workerRef.current = worker;
 
+    // When tab becomes visible after being backgrounded, tell the worker
+    // to reconnect — WebSocket connections may have been closed by the
+    // OS or browser while the tab was hidden.
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        worker.postMessage({ type: "reconnect" });
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
       worker.postMessage({ type: "stop" });
       worker.terminate();
       workerRef.current = null;
     };
-  }, [identity, capabilities, walletAddress]);
+  }, [identity, capabilities, walletAddress, capsTrigger]);
 }

@@ -61,7 +61,11 @@ interface StopMessage {
   type: "stop";
 }
 
-type InMessage = StartMessage | StopMessage;
+interface ReconnectMessage {
+  type: "reconnect";
+}
+
+type InMessage = StartMessage | StopMessage | ReconnectMessage;
 
 interface LogMessage {
   type: "log";
@@ -82,12 +86,16 @@ type OutMessage = LogMessage | SaleMessage;
 const HEARTBEAT_MS = 60_000;
 const PING_COOLDOWN_MS = 1000;
 const MAX_PROCESSED_JOBS = 1000;
+const SUSPEND_CHECK_MS = 10_000;    // check every 10s
+const SUSPEND_DRIFT_MS = 30_000;    // reconnect if timer drifted >30s
 
 let client: ElisymClient | null = null;
 let identity: ElisymIdentity | null = null;
 let caps: { card: CapabilityCard; dTag: string }[] = [];
 
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+let suspendCheckInterval: ReturnType<typeof setInterval> | null = null;
+let lastCheckTime = 0;
 let dmSub: SubCloser | null = null;
 let jobSub: SubCloser | null = null;
 const paymentSubs: SubCloser[] = [];
@@ -95,6 +103,7 @@ const processedJobs = new Set<string>();
 const lastPings = new Map<string, number>();
 let consecutiveErrors = 0;
 let recoveryDone = false;
+let isReconnecting = false;
 
 function post(msg: OutMessage) {
   self.postMessage(msg);
@@ -221,6 +230,9 @@ function setupSubscriptions() {
 // --------------- Reconnect ---------------
 
 function restartConnection() {
+  if (isReconnecting) return;
+  isReconnecting = true;
+
   closeSubs();
 
   if (client) {
@@ -230,6 +242,7 @@ function restartConnection() {
 
   client = new ElisymClient();
   setupSubscriptions();
+  isReconnecting = false;
   log("Reconnected to relays");
 }
 
@@ -240,11 +253,17 @@ function cleanup() {
     clearInterval(heartbeatInterval);
     heartbeatInterval = null;
   }
+  if (suspendCheckInterval) {
+    clearInterval(suspendCheckInterval);
+    suspendCheckInterval = null;
+  }
   closeSubs();
   processedJobs.clear();
   lastPings.clear();
   consecutiveErrors = 0;
   recoveryDone = false;
+  isReconnecting = false;
+  lastCheckTime = 0;
 
   if (client) {
     client.close();
@@ -293,6 +312,22 @@ function start(msg: StartMessage) {
   void publishHeartbeat();
   heartbeatInterval = setInterval(() => void publishHeartbeat(), HEARTBEAT_MS);
   log("Heartbeat started");
+
+  // --- Suspend detection ---
+  // Detect when the browser/OS suspended the worker (e.g. background tab,
+  // App Nap). If the timer fires much later than expected, WebSocket
+  // connections are likely dead — reconnect immediately.
+  lastCheckTime = Date.now();
+  suspendCheckInterval = setInterval(() => {
+    const now = Date.now();
+    const drift = now - lastCheckTime - SUSPEND_CHECK_MS;
+    lastCheckTime = now;
+    if (drift > SUSPEND_DRIFT_MS) {
+      log(`Detected suspension (drift ${Math.round(drift / 1000)}s), reconnecting...`);
+      restartConnection();
+      void publishHeartbeat();
+    }
+  }, SUSPEND_CHECK_MS);
 
   // --- Subscriptions ---
   setupSubscriptions();
@@ -433,6 +468,22 @@ self.onmessage = (e: MessageEvent<InMessage>) => {
     case "stop":
       cleanup();
       log("Worker stopped");
+      break;
+    case "reconnect":
+      if (client && identity && caps.length > 0) {
+        const probeCap = caps[caps.length - 1]!;
+        const PROBE_TIMEOUT = 3_000;
+        const probe = client.discovery.publishCapability(identity, probeCap.card);
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), PROBE_TIMEOUT),
+        );
+        Promise.race([probe, timeout])
+          .then(() => log("Connection probe OK"))
+          .catch(() => {
+            log("Connection probe failed, reconnecting...");
+            restartConnection();
+          });
+      }
       break;
   }
 };
