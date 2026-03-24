@@ -56,6 +56,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body className="bg-bg text-text font-sans min-h-screen flex flex-col">
         <Providers>
+          <div className="bg-amber-500/90 text-black text-center text-xs py-1.5 font-medium">
+            You're on Devnet. Make sure your wallet is also set to Devnet:{" "}
+            <span className="font-normal">Settings &rarr; Developer Settings &rarr; Testnet Mode</span>
+          </div>
           <Header />
           <main className="flex-1">{children}</main>
           <Footer />
