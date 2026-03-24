@@ -83,7 +83,7 @@ type OutMessage = LogMessage | SaleMessage;
 
 // --------------- State ---------------
 
-const HEARTBEAT_MS = 30_000;
+const HEARTBEAT_MS = 600_000;
 const PING_COOLDOWN_MS = 1000;
 const MAX_PROCESSED_JOBS = 1000;
 const SUSPEND_CHECK_MS = 10_000;    // check every 10s

@@ -10,7 +10,7 @@ import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
 import { uploadToNostrBuild } from "~/lib/uploadImage";
 import { cacheGet, cacheSet, cacheDel } from "~/lib/localCache";
-import { addDeletedDTags, removeDeletedDTags, CAPABILITIES_CHANGED_EVENT } from "~/hooks/useHeartbeat";
+import { addDeletedDTags, removeDeletedDTags, getDeletedDTags, CAPABILITIES_CHANGED_EVENT } from "~/hooks/useHeartbeat";
 import type { Filter } from "nostr-tools";
 
 interface NostrProfile {
