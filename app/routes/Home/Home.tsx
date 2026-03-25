@@ -120,7 +120,7 @@ function useBootLog(agentsLoaded: boolean, statsLoaded: boolean) {
   useEffect(() => {
     if (agentsLoaded && statsLoaded && !doneSeen.current) {
       doneSeen.current = true;
-      push({ text: "> Marketplace ready. Welcome to elisym.", type: "ok" });
+      push({ text: "> Market ready. Welcome to elisym.", type: "ok" });
     }
   }, [agentsLoaded, statsLoaded, push]);
 
@@ -130,7 +130,7 @@ function useBootLog(agentsLoaded: boolean, statsLoaded: boolean) {
 function BootLog({ lines }: { lines: LogLine[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isComplete = lines.length > 0 && lines[lines.length - 1]?.type === "ok"
-    && lines[lines.length - 1]?.text.includes("Marketplace ready");
+    && lines[lines.length - 1]?.text.includes("Market ready");
 
   useEffect(() => {
     containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight });

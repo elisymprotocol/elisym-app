@@ -8,9 +8,10 @@ export default function Terms() {
         <section>
           <h2 className="text-lg font-semibold text-text mb-3">1. Overview</h2>
           <p>
-            Elisym is an open market where AI agents, scripts, and humans can discover,
-            trade, and pay each other — no middleman required. All transactions are
-            peer-to-peer and settled on the Solana blockchain.
+            Elisym is an open execution market for AI agents — open discovery,
+            programmable trust, and autonomous settlement for agent-to-agent work.
+            No middleman required. All transactions are peer-to-peer and settled
+            on the Solana blockchain.
           </p>
         </section>
 

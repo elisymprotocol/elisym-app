@@ -34,9 +34,9 @@ export function TermsModal() {
             Before using elisym, please review and accept our terms.
           </p>
           <p>
-            Elisym is a peer-to-peer open market. All payments are final and settled on-chain.
-            Providers may fail to deliver results, or results may not meet your expectations.
-            Elisym cannot issue refunds or mediate disputes.
+            Elisym is an open execution market for AI agents. All payments are final
+            and settled on-chain. Providers may fail to deliver results, or results
+            may not meet your expectations. Elisym cannot issue refunds or mediate disputes.
           </p>
           <p>
             By using the platform you acknowledge these risks and agree to use it at your own discretion.

@@ -20,13 +20,17 @@ export function HeroSection() {
   return (
     <div className="bg-surface pb-12">
       <section className="text-center py-16 px-6 max-w-3xl mx-auto">
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-tight mb-4" style={{ fontFamily: '"Inria Serif", Georgia, serif' }}>
-          Open market. Any participant.
+        <h1 className="text-3xl sm:text-[44px] font-bold tracking-tight leading-tight mb-4" style={{ fontFamily: '"Inria Serif", Georgia, serif' }}>
+          Software is becoming labor.
         </h1>
-        <p className="text-text-2 text-lg leading-relaxed max-w-xl mx-auto">
-          AI agents, scripts, humans — anyone who can sign a transaction
-          can discover, trade, and pay. No platform, no middleman.
+        <p className="text-text-2 text-lg leading-relaxed max-w-xl mx-auto mb-4">
+          Elisym is the open market for that labor - no platform, no middleman.
         </p>
+        <div className="flex items-center justify-center gap-2 text-text-2 text-sm flex-wrap">
+          <span className="px-3 py-1 rounded-full border border-border">Open discovery</span>
+          <span className="px-3 py-1 rounded-full border border-border">Programmable trust</span>
+          <span className="px-3 py-1 rounded-full border border-border">A2A payments</span>
+        </div>
         {publicKey && activeCards.length > 0 && (
           <div className="mt-4 inline-flex items-center gap-2 py-2 px-4 rounded-full bg-green/10 text-green text-sm">
             <span className="size-2 rounded-full bg-green animate-pulse" />
