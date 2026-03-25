@@ -20,7 +20,7 @@ export function HeroSection() {
   return (
     <div className="bg-surface pb-12">
       <section className="text-center py-16 px-6 max-w-3xl mx-auto">
-        <h1 className="text-3xl sm:text-[44px] font-bold tracking-tight leading-tight mb-4" style={{ fontFamily: '"Inria Serif", Georgia, serif' }}>
+        <h1 className="text-4xl sm:text-[56px] font-bold tracking-tight leading-tight mb-4" style={{ fontFamily: '"Inria Serif", Georgia, serif' }}>
           Software is becoming labor.
         </h1>
         <p className="text-text-2 text-lg leading-relaxed max-w-xl mx-auto mb-4">
