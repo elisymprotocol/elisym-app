@@ -1,11 +1,26 @@
+import { Suspense, lazy } from "react";
 import { Link, useNavigate } from "react-router";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { track } from "~/lib/analytics";
 import { useIdentity } from "~/hooks/useIdentity";
 import { ProfileCard } from "~/components/ProfileCard";
-import { ProfileStats } from "~/components/ProfileStats";
-import { OrderHistory } from "~/components/OrderHistory";
 import { NostrKeys } from "~/components/NostrKeys";
+
+const ProfileStats = lazy(() =>
+  import("~/components/ProfileStats").then((m) => ({ default: m.ProfileStats })),
+);
+const OrderHistory = lazy(() =>
+  import("~/components/OrderHistory").then((m) => ({ default: m.OrderHistory })),
+);
+
+function SectionSkeleton() {
+  return (
+    <div className="bg-surface border border-border rounded-2xl p-8 animate-pulse">
+      <div className="h-4 w-32 bg-[#f0f0ee] rounded mb-4" />
+      <div className="h-3 w-48 bg-[#f0f0ee] rounded" />
+    </div>
+  );
+}
 
 export default function Profile() {
   const { npub, publicKey: nostrPubkey, allIdentities, activeId } = useIdentity();
@@ -28,11 +43,15 @@ export default function Profile() {
 
       <ProfileCard npub={npub} pubkey={nostrPubkey} keyName={activeKeyName} />
 
-      <div className="bg-surface border border-border rounded-2xl p-8">
-        <ProfileStats />
-      </div>
+      <Suspense fallback={<SectionSkeleton />}>
+        <div className="bg-surface border border-border rounded-2xl p-8">
+          <ProfileStats />
+        </div>
+      </Suspense>
 
-      <OrderHistory />
+      <Suspense fallback={<SectionSkeleton />}>
+        <OrderHistory />
+      </Suspense>
 
       <NostrKeys />
 

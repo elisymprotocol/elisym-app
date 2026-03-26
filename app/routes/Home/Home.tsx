@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from "react";
 import { useAgents } from "~/hooks/useAgents";
 import { useAgentDisplay } from "~/hooks/useAgentDisplay";
 import { useAgentFeedback } from "~/hooks/useAgentFeedback";
@@ -237,9 +237,10 @@ export default function Home() {
     }
   }, [state.currentFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const deferredFiltered = useDeferredValue(filtered);
+  const totalPages = Math.max(1, Math.ceil(deferredFiltered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const paged = deferredFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   if (isColdStart) {
     return (
