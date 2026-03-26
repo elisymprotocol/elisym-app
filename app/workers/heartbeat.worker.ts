@@ -2,6 +2,8 @@ import {
   ElisymClient,
   ElisymIdentity,
   PaymentService,
+  KIND_JOB_REQUEST,
+  KIND_JOB_RESULT,
   type CapabilityCard,
 } from "@elisym/sdk";
 import type { Filter, Event } from "nostr-tools";
@@ -221,7 +223,7 @@ function setupSubscriptions() {
   // Job handler
   jobSub = client.marketplace.subscribeToJobRequests(
     identity,
-    [5100],
+    [KIND_JOB_REQUEST],
     (event) => void handleJob(event),
   );
   log("Job handler active");
@@ -340,7 +342,7 @@ async function recoverPendingJobs() {
 
     // 1. Fetch job requests addressed to us (last 24h)
     const requests = await client.pool.querySync({
-      kinds: [5100],
+      kinds: [KIND_JOB_REQUEST],
       "#p": [myPubkey],
       since: now - 86400,
     } as Filter);
@@ -375,7 +377,7 @@ async function recoverPendingJobs() {
 
     // 4. Fetch results already delivered by us
     const results = await client.pool.queryBatchedByTag(
-      { kinds: [6100], authors: [myPubkey] } as Filter,
+      { kinds: [KIND_JOB_RESULT], authors: [myPubkey] } as Filter,
       "e",
       requestIds,
     );
