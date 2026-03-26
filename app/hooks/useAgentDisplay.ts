@@ -1,7 +1,20 @@
 import { useMemo } from "react";
-import { formatSol, timeAgo, truncateKey } from "@elisym/sdk";
+import { formatSol, truncateKey } from "@elisym/sdk";
 import type { Agent, CapabilityCard } from "@elisym/sdk";
 import type { FeedbackMap } from "./useAgentFeedback";
+
+/** Approximate "time ago" — rounds to coarse units with "~" prefix */
+function approxTimeAgo(unix: number): string {
+  const seconds = Math.max(0, Math.floor(Date.now() / 1000 - unix));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 5) return "~a few min ago";
+  if (minutes < 60) return `~${Math.round(minutes / 5) * 5}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `~${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `~${days}d ago`;
+}
 
 export interface AgentDisplayData {
   pubkey: string;
@@ -61,7 +74,7 @@ function toDisplayData(agent: Agent, feedbackMap?: FeedbackMap): AgentDisplayDat
     priceLamports: price,
     wallet: walletAddress ? truncateKey(walletAddress, 4) : "",
     walletAddress,
-    lastSeen: timeAgo(agent.lastSeen),
+    lastSeen: approxTimeAgo(agent.lastSeen),
     lastSeenTs: agent.lastSeen,
     picture: agent.picture,
     cards,
