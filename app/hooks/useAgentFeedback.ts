@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { useElisymClient } from "./useElisymClient";
 import { useLocalQuery } from "./useLocalQuery";
-import { KIND_JOB_FEEDBACK, KIND_JOB_REQUEST } from "@elisym/sdk";
+import { KIND_JOB_FEEDBACK, KIND_JOB_REQUEST, KIND_JOB_RESULT } from "@elisym/sdk";
 
 export interface FeedbackCounts {
   positive: number;
@@ -78,7 +78,7 @@ export function useAgentFeedback(agentPubkeys: string[]) {
     queryFn: async () => {
       if (agentPubkeys.length === 0) return {};
 
-      const [feedbackEvents, jobRequests] = await Promise.all([
+      const [feedbackEvents, jobRequests, jobResults] = await Promise.all([
         client.pool.querySync({
           kinds: [KIND_JOB_FEEDBACK],
           "#p": agentPubkeys,
@@ -86,6 +86,10 @@ export function useAgentFeedback(agentPubkeys: string[]) {
         client.pool.querySync({
           kinds: [KIND_JOB_REQUEST],
           "#p": agentPubkeys,
+        }),
+        client.pool.querySync({
+          kinds: [KIND_JOB_RESULT],
+          authors: agentPubkeys,
         }),
       ]);
 
@@ -97,6 +101,13 @@ export function useAgentFeedback(agentPubkeys: string[]) {
       for (const req of jobRequests) seenRequests.set(req.id, req);
 
       const map: FeedbackMap = {};
+
+      // Build set of request IDs that have a completed result
+      const completedJobIds = new Set<string>();
+      for (const res of jobResults) {
+        const jobId = res.tags.find((t) => t[0] === "e")?.[1];
+        if (jobId) completedJobIds.add(jobId);
+      }
 
       // Map job ID → { providerPubkey, capability } for feedback lookup
       const jobMeta = new Map<string, { provider: string; capability: string }>();
@@ -115,7 +126,12 @@ export function useAgentFeedback(agentPubkeys: string[]) {
             byCapability: {},
           };
         }
-        map[providerPubkey].purchases++;
+
+        // Only count as purchase if the job was actually completed
+        const isCompleted = completedJobIds.has(req.id);
+        if (isCompleted) {
+          map[providerPubkey].purchases++;
+        }
 
         if (capability) {
           jobMeta.set(req.id, { provider: providerPubkey, capability });
@@ -124,7 +140,9 @@ export function useAgentFeedback(agentPubkeys: string[]) {
               positive: 0, negative: 0, total: 0, purchases: 0,
             };
           }
-          map[providerPubkey].byCapability[capability].purchases++;
+          if (isCompleted) {
+            map[providerPubkey].byCapability[capability].purchases++;
+          }
         }
       }
 
