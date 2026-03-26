@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useUI } from "~/contexts/UIContext";
 import { useAgents } from "~/hooks/useAgents";
 import { useAgentFeedback } from "~/hooks/useAgentFeedback";
@@ -18,8 +19,9 @@ const FILTERS = [
 
 export function FilterBar() {
   const [state, dispatch] = useUI();
-  const { dataUpdatedAt, isFetching: agentsFetching } = useAgents();
-  const { isFetching: feedbackFetching } = useAgentFeedback();
+  const { data: agents, dataUpdatedAt, isFetching: agentsFetching } = useAgents();
+  const agentPubkeys = useMemo(() => (agents ?? []).map((a) => a.pubkey), [agents]);
+  const { isFetching: feedbackFetching } = useAgentFeedback(agentPubkeys);
   const queryClient = useQueryClient();
   const synced = !!dataUpdatedAt;
   const isFetching = agentsFetching || feedbackFetching;

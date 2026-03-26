@@ -179,7 +179,8 @@ const PAGE_SIZE = 18;
 export default function Home() {
   const { data: agents, isLoading: agentsLoading, fromCache: agentsFromCache } = useAgents();
   const { data: stats, isLoading: statsLoading } = useStats();
-  const { data: feedbackMap } = useAgentFeedback();
+  const agentPubkeys = useMemo(() => (agents ?? []).map((a) => a.pubkey), [agents]);
+  const { data: feedbackMap } = useAgentFeedback(agentPubkeys);
   const displayAgents = useAgentDisplay(agents ?? [], feedbackMap);
   const [state] = useUI();
   const [page, setPage] = useState(1);

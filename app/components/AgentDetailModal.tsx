@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { formatSol, truncateKey } from "@elisym/sdk";
+import { formatSol, truncateKey, toDTag } from "@elisym/sdk";
 import { track } from "~/lib/analytics";
 import type { CapabilityCard } from "@elisym/sdk";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -11,7 +11,6 @@ import { useOptionalIdentity } from "~/hooks/useIdentity";
 import { usePingAgent, type PingStatus } from "~/hooks/usePingAgent";
 import { useElisymClient } from "~/hooks/useElisymClient";
 import type { AgentDisplayData } from "~/hooks/useAgentDisplay";
-import { useCapabilityFeedback } from "~/hooks/useCapabilityFeedback";
 
 interface AgentDetailModalProps {
   agent: AgentDisplayData;
@@ -29,7 +28,6 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
   const isOwn = idCtx?.publicKey === agent.pubkey;
   const pingedStatus = usePingAgent(isOwn ? "" : agent.pubkey);
   const pingStatus: PingStatus = isOwn ? "online" : pingedStatus;
-  const { data: capFeedback } = useCapabilityFeedback(agent.pubkey);
 
   return (
     <div
@@ -91,7 +89,7 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
 
         <div className="flex flex-col gap-3">
           {agent.cards.map((card) => {
-            const stats = capFeedback?.byCapability?.[card.name];
+            const stats = agent.byCapability[toDTag(card.name)];
             return (
               <CapabilityItem
                 key={card.name}

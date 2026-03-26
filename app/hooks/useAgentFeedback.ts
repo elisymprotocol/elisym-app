@@ -10,11 +10,42 @@ export interface FeedbackCounts {
   purchases: number;
 }
 
-export type FeedbackMap = Record<string, FeedbackCounts>;
+/** Per-capability stats for a single agent */
+export type CapabilityStatsMap = Record<string, FeedbackCounts>;
+
+export interface AgentFeedbackEntry extends FeedbackCounts {
+  /** capability d-tag → per-capability stats */
+  byCapability: CapabilityStatsMap;
+}
+
+/** pubkey → AgentFeedbackEntry */
+export type FeedbackMap = Record<string, AgentFeedbackEntry>;
 
 /** Merge two maps, keeping the max of each field per pubkey */
 function mergeMax(prev: FeedbackMap, next: FeedbackMap): FeedbackMap {
   const merged: FeedbackMap = { ...prev };
+  for (const [key, val] of Object.entries(next)) {
+    const p = merged[key];
+    if (!p) {
+      merged[key] = val;
+    } else {
+      merged[key] = {
+        positive: Math.max(p.positive, val.positive),
+        negative: Math.max(p.negative, val.negative),
+        total: Math.max(p.total, val.total),
+        purchases: Math.max(p.purchases, val.purchases),
+        byCapability: mergeCapabilityMax(p.byCapability, val.byCapability),
+      };
+    }
+  }
+  return merged;
+}
+
+function mergeCapabilityMax(
+  prev: CapabilityStatsMap,
+  next: CapabilityStatsMap,
+): CapabilityStatsMap {
+  const merged: CapabilityStatsMap = { ...prev };
   for (const [key, val] of Object.entries(next)) {
     const p = merged[key];
     if (!p) {
@@ -31,41 +62,70 @@ function mergeMax(prev: FeedbackMap, next: FeedbackMap): FeedbackMap {
   return merged;
 }
 
-export function useAgentFeedback() {
+/**
+ * Fetches feedback and purchase stats for a given set of agent pubkeys.
+ * Builds both per-agent and per-capability groupings in a single pass.
+ */
+export function useAgentFeedback(agentPubkeys: string[]) {
   const { client } = useElisymClient();
   const highWater = useRef<FeedbackMap>({});
 
+  // Stable key: sort and join so order doesn't cause refetches
+  const pubkeysKey = agentPubkeys.slice().sort().join(",");
+
   return useLocalQuery<FeedbackMap>({
-    queryKey: ["agent-feedback"],
+    queryKey: ["agent-feedback", pubkeysKey],
     queryFn: async () => {
+      if (agentPubkeys.length === 0) return {};
+
       const [feedbackEvents, jobRequests] = await Promise.all([
         client.pool.querySync({
           kinds: [KIND_JOB_FEEDBACK],
-          "#t": ["elisym"],
+          "#p": agentPubkeys,
         }),
         client.pool.querySync({
           kinds: [KIND_JOB_REQUEST],
-          "#t": ["elisym"],
+          "#p": agentPubkeys,
         }),
       ]);
 
       // Dedup events by ID
-      const seenFeedback = new Map<string, typeof feedbackEvents[0]>();
+      const seenFeedback = new Map<string, (typeof feedbackEvents)[0]>();
       for (const ev of feedbackEvents) seenFeedback.set(ev.id, ev);
 
-      const seenRequests = new Map<string, typeof jobRequests[0]>();
+      const seenRequests = new Map<string, (typeof jobRequests)[0]>();
       for (const req of jobRequests) seenRequests.set(req.id, req);
 
       const map: FeedbackMap = {};
+
+      // Map job ID → { providerPubkey, capability } for feedback lookup
+      const jobMeta = new Map<string, { provider: string; capability: string }>();
 
       for (const req of seenRequests.values()) {
         const providerPubkey = req.tags.find((t) => t[0] === "p")?.[1];
         if (!providerPubkey) continue;
 
+        const capability = req.tags.find(
+          (t) => t[0] === "t" && t[1] !== "elisym",
+        )?.[1];
+
         if (!map[providerPubkey]) {
-          map[providerPubkey] = { positive: 0, negative: 0, total: 0, purchases: 0 };
+          map[providerPubkey] = {
+            positive: 0, negative: 0, total: 0, purchases: 0,
+            byCapability: {},
+          };
         }
         map[providerPubkey].purchases++;
+
+        if (capability) {
+          jobMeta.set(req.id, { provider: providerPubkey, capability });
+          if (!map[providerPubkey].byCapability[capability]) {
+            map[providerPubkey].byCapability[capability] = {
+              positive: 0, negative: 0, total: 0, purchases: 0,
+            };
+          }
+          map[providerPubkey].byCapability[capability].purchases++;
+        }
       }
 
       for (const ev of seenFeedback.values()) {
@@ -76,15 +136,38 @@ export function useAgentFeedback() {
         if (!providerPubkey) continue;
 
         if (!map[providerPubkey]) {
-          map[providerPubkey] = { positive: 0, negative: 0, total: 0, purchases: 0 };
+          map[providerPubkey] = {
+            positive: 0, negative: 0, total: 0, purchases: 0,
+            byCapability: {},
+          };
         }
 
-        if (ratingTag[1] === "1") {
+        const isPositive = ratingTag[1] === "1";
+        if (isPositive) {
           map[providerPubkey].positive++;
         } else {
           map[providerPubkey].negative++;
         }
         map[providerPubkey].total++;
+
+        // Per-capability feedback
+        const jobId = ev.tags.find((t) => t[0] === "e")?.[1];
+        const meta = jobId ? jobMeta.get(jobId) : undefined;
+        if (meta) {
+          const capStats = map[providerPubkey].byCapability;
+          if (!capStats[meta.capability]) {
+            capStats[meta.capability] = {
+              positive: 0, negative: 0, total: 0, purchases: 0,
+            };
+          }
+          const cap = capStats[meta.capability]!;
+          if (isPositive) {
+            cap.positive++;
+          } else {
+            cap.negative++;
+          }
+          cap.total++;
+        }
       }
 
       // Never decrease — merge with high water mark
@@ -92,11 +175,11 @@ export function useAgentFeedback() {
       return highWater.current;
     },
     cacheTransform: (cached) => {
-      // Seed high water mark from IndexedDB cache on first load
       highWater.current = mergeMax(highWater.current, cached);
       return highWater.current;
     },
     staleTime: 1000 * 30,
     refetchInterval: 1000 * 60,
+    enabled: agentPubkeys.length > 0,
   });
 }

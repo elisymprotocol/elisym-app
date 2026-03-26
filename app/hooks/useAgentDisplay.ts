@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { formatSol, truncateKey } from "@elisym/sdk";
 import type { Agent, CapabilityCard } from "@elisym/sdk";
-import type { FeedbackMap } from "./useAgentFeedback";
+import type { FeedbackMap, CapabilityStatsMap } from "./useAgentFeedback";
 
 /** Approximate "time ago" — rounds to coarse units with "~" prefix */
 function approxTimeAgo(unix: number): string {
@@ -36,6 +36,7 @@ export interface AgentDisplayData {
   feedbackNegative: number;
   feedbackTotal: number;
   purchases: number;
+  byCapability: CapabilityStatsMap;
 }
 
 function toDisplayData(agent: Agent, feedbackMap?: FeedbackMap): AgentDisplayData {
@@ -83,6 +84,7 @@ function toDisplayData(agent: Agent, feedbackMap?: FeedbackMap): AgentDisplayDat
     feedbackNegative: fb?.negative ?? 0,
     feedbackTotal: fb?.total ?? 0,
     purchases: fb?.purchases ?? 0,
+    byCapability: fb?.byCapability ?? {},
   };
 }
 
