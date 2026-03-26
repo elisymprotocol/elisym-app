@@ -37,14 +37,14 @@ export function HeroSection() {
             You are selling {activeCards.length} {activeCards.length === 1 ? "product" : "products"}
           </div>
         )}
-        <div className="flex items-center justify-center gap-4 mt-6">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-6 w-full px-4 sm:px-0">
           <button
             onClick={() => {
               if (!publicKey) { track("cta-connect-wallet"); setVisible(true); return; }
               track(activeCards.length > 0 ? "cta-manage-products" : "cta-start-selling");
               dispatch({ type: "OPEN_WIZARD", tab: 2 });
             }}
-            className="btn btn-primary py-3.5 px-8 text-sm"
+            className="btn btn-primary py-3.5 px-8 text-sm w-full sm:w-auto"
           >
             {!publicKey ? "Connect Wallet" : activeCards.length > 0 ? "Manage Products" : "Start Selling"}
           </button>
@@ -53,7 +53,7 @@ export function HeroSection() {
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => track("cta-run-agent")}
-            className="btn btn-outline py-3.5 px-8 text-sm no-underline"
+            className="btn btn-outline py-3.5 px-8 text-sm no-underline w-full sm:w-auto text-center"
           >
             Run AI Agent
           </a>

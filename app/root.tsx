@@ -67,15 +67,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <TermsModal />
           <Toaster
             theme="light"
-            position="bottom-right"
+            position="top-right"
             duration={1500}
             toastOptions={{
               style: {
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text-2)",
+                background: "rgba(255, 255, 255, 0.72)",
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
+                border: "1px solid rgba(255, 255, 255, 0.3)",
+                color: "var(--color-text)",
                 fontSize: "13px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)",
+                borderRadius: "14px",
               },
             }}
           />

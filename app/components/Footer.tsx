@@ -19,7 +19,7 @@ export function Footer() {
   }, [dataUpdatedAt]);
 
   return (
-    <footer className="border-t border-border py-5 px-8 flex items-center justify-between mt-12">
+    <footer className="border-t border-border py-5 px-4 sm:px-8 flex items-center justify-between mt-12">
       <div className="flex items-center gap-2 text-sm text-text-2">
         <img
           src="https://www.elisym.network/logo-black.png"
@@ -27,7 +27,7 @@ export function Footer() {
           className="h-[18px]"
         />
         {ago && (
-          <span className="text-[11px] text-text-2/50 ml-2">
+          <span className="hidden sm:inline text-[11px] text-text-2/50 ml-2 whitespace-nowrap">
             synced {ago}
           </span>
         )}

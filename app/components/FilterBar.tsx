@@ -46,15 +46,15 @@ export function FilterBar() {
           />
         </button>
       </h2>
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-1 p-1 rounded-xl bg-[#f5f4f2] overflow-x-auto no-scrollbar">
         {FILTERS.map((f) => (
           <button
             key={f.key}
             onClick={() => { track("filter", { category: f.key }); dispatch({ type: "SET_FILTER", filter: f.key }); }}
-            className={`py-2 px-4 rounded-full border text-xs font-medium cursor-pointer transition-all ${
+            className={`py-1.5 px-3.5 rounded-lg text-xs font-medium cursor-pointer transition-all border-none shrink-0 whitespace-nowrap ${
               state.currentFilter === f.key
-                ? "bg-accent border-accent text-white"
-                : "bg-transparent border-border text-text-2 hover:border-accent hover:text-text"
+                ? "bg-white text-text shadow-sm"
+                : "bg-transparent text-text-2 hover:text-text"
             }`}
           >
             {f.label}
