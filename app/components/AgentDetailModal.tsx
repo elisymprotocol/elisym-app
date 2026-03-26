@@ -251,7 +251,7 @@ function CapabilityItem({
           <div className="mt-1 pt-3 border-t border-border">
             {result ? (
               <div>
-                <div className="p-3 bg-surface rounded-lg border border-border text-xs text-text leading-relaxed whitespace-pre-wrap">
+                <div className="p-3 bg-surface rounded-lg border border-border text-xs text-text leading-relaxed whitespace-pre-wrap break-words">
                   {result}
                 </div>
                 {rated ? (

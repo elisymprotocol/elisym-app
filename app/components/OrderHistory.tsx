@@ -279,7 +279,7 @@ export function OrderHistory() {
               <div className="px-4 pb-4 border-t border-border">
                 {order.result ? (
                   <div>
-                    <div className="mt-3 p-3 bg-surface rounded-lg border border-border text-xs text-text leading-relaxed whitespace-pre-wrap">
+                    <div className="mt-3 p-3 bg-surface rounded-lg border border-border text-xs text-text leading-relaxed whitespace-pre-wrap break-words">
                       {order.result}
                     </div>
                     {ratedJobs.has(order.jobEventId) ? (
