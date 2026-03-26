@@ -1,9 +1,23 @@
+import { useRef } from "react";
 import { useElisymClient } from "./useElisymClient";
 import { useLocalQuery } from "./useLocalQuery";
 import type { NetworkStats } from "@elisym/sdk";
 
+/** Keep the max of each stat field */
+function mergeMax(prev: NetworkStats, next: NetworkStats): NetworkStats {
+  return {
+    totalAgentCount: Math.max(prev.totalAgentCount, next.totalAgentCount),
+    agentCount: Math.max(prev.agentCount, next.agentCount),
+    jobCount: Math.max(prev.jobCount, next.jobCount),
+    totalLamports: Math.max(prev.totalLamports, next.totalLamports),
+  };
+}
+
+const ZERO: NetworkStats = { totalAgentCount: 0, agentCount: 0, jobCount: 0, totalLamports: 0 };
+
 export function useStats() {
   const { client } = useElisymClient();
+  const highWater = useRef<NetworkStats>(ZERO);
 
   return useLocalQuery<NetworkStats>({
     queryKey: ["network-stats"],
@@ -22,12 +36,20 @@ export function useStats() {
         if (j.amount) totalLamports += j.amount;
       }
 
-      return {
+      const stats: NetworkStats = {
         totalAgentCount,
         agentCount: totalAgentCount,
         jobCount: completedJobs.length,
         totalLamports,
       };
+
+      // Never decrease
+      highWater.current = mergeMax(highWater.current, stats);
+      return highWater.current;
+    },
+    cacheTransform: (cached) => {
+      highWater.current = mergeMax(highWater.current, cached);
+      return highWater.current;
     },
     staleTime: 1000 * 30,
     refetchInterval: 1000 * 60,

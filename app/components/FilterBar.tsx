@@ -1,7 +1,7 @@
 import { useUI } from "~/contexts/UIContext";
 import { useAgents } from "~/hooks/useAgents";
+import { useAgentFeedback } from "~/hooks/useAgentFeedback";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import { track } from "~/lib/analytics";
 
 export const KNOWN_CATEGORIES = ["ui-ux", "summary", "tools", "code", "data"];
@@ -18,20 +18,16 @@ const FILTERS = [
 
 export function FilterBar() {
   const [state, dispatch] = useUI();
-  const { dataUpdatedAt } = useAgents();
+  const { dataUpdatedAt, isFetching: agentsFetching } = useAgents();
+  const { isFetching: feedbackFetching } = useAgentFeedback();
   const queryClient = useQueryClient();
   const synced = !!dataUpdatedAt;
-  const [resyncing, setResyncing] = useState(false);
+  const isFetching = agentsFetching || feedbackFetching;
 
-  async function handleResync() {
-    if (resyncing) return;
-    setResyncing(true);
+  function handleResync() {
     track("resync");
-    try {
-      await queryClient.refetchQueries({ queryKey: ["agents"] });
-    } finally {
-      setResyncing(false);
-    }
+    queryClient.refetchQueries({ queryKey: ["agents"] });
+    queryClient.refetchQueries({ queryKey: ["agent-feedback"] });
   }
 
   return (
@@ -40,13 +36,12 @@ export function FilterBar() {
         Available Providers
         <button
           onClick={handleResync}
-          disabled={resyncing}
           className="size-4 flex items-center justify-center bg-transparent border-none cursor-pointer p-0"
           title="Resync"
         >
           <span
             className={`size-2 rounded-full transition-colors duration-700 ${
-              resyncing || !synced ? "bg-yellow-400 animate-pulse" : "bg-green"
+              isFetching || !synced ? "bg-[#f0d68a] animate-pulse" : "bg-[#7dd4a3]"
             }`}
           />
         </button>

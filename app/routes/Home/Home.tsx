@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAgents } from "~/hooks/useAgents";
 import { useAgentDisplay } from "~/hooks/useAgentDisplay";
+import { useAgentFeedback } from "~/hooks/useAgentFeedback";
 import { useStats } from "~/hooks/useStats";
 import { useUI } from "~/contexts/UIContext";
 import { HeroSection } from "~/components/HeroSection";
@@ -178,7 +179,8 @@ const PAGE_SIZE = 18;
 export default function Home() {
   const { data: agents, isLoading: agentsLoading, fromCache: agentsFromCache } = useAgents();
   const { data: stats, isLoading: statsLoading } = useStats();
-  const displayAgents = useAgentDisplay(agents ?? []);
+  const { data: feedbackMap } = useAgentFeedback();
+  const displayAgents = useAgentDisplay(agents ?? [], feedbackMap);
   const [state] = useUI();
   const [page, setPage] = useState(1);
 
@@ -189,7 +191,7 @@ export default function Home() {
   const bootLines = useBootLog(!agentsLoading, !statsLoading);
 
 
-  const filtered =
+  const filteredUnsorted =
     state.currentFilter === "all"
       ? displayAgents
       : state.currentFilter === "other"
@@ -201,6 +203,30 @@ export default function Home() {
               t.toLowerCase().includes(state.currentFilter.toLowerCase()),
             ),
           );
+
+  const filtered = useMemo(() => {
+    const TEN_MINUTES = 10 * 60;
+    const now = Math.floor(Date.now() / 1000);
+
+    const positiveRate = (a: typeof filteredUnsorted[number]) =>
+      a.feedbackTotal > 0 ? a.feedbackPositive / a.feedbackTotal : 0;
+
+    // Split into online (last 10 min) and the rest
+    const online = filteredUnsorted.filter((a) => now - a.lastSeenTs < TEN_MINUTES);
+    const rest = filteredUnsorted.filter((a) => now - a.lastSeenTs >= TEN_MINUTES);
+
+    // Online: sort by positive rating % descending, tiebreak by lastSeen
+    online.sort((a, b) => {
+      const rateDiff = positiveRate(b) - positiveRate(a);
+      if (rateDiff !== 0) return rateDiff;
+      return b.lastSeenTs - a.lastSeenTs;
+    });
+
+    // Rest: sort by lastSeen descending
+    rest.sort((a, b) => b.lastSeenTs - a.lastSeenTs);
+
+    return [...online, ...rest];
+  }, [filteredUnsorted]);
 
   // Reset to page 1 when filter changes
   const prevFilter = useRef(state.currentFilter);
