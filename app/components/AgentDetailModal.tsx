@@ -197,22 +197,20 @@ function CapabilityItem({
         />
       )}
 
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="text-sm font-semibold line-clamp-2 break-all">
-            {card.name}
-          </div>
-          {price != null && (
-            <div className="text-sm font-bold text-green shrink-0">
-              {formatSol(price)}
-            </div>
-          )}
+      <div className="p-4 flex flex-col gap-2.5">
+        {/* Name */}
+        <div className="text-sm font-semibold line-clamp-2 break-all">
+          {card.name}
         </div>
+
+        {/* Description */}
         {card.description && (
-          <div className="text-xs text-text-2 leading-relaxed mb-2">
+          <div className="text-xs text-text-2 leading-relaxed">
             {card.description}
           </div>
         )}
+
+        {/* Tags */}
         {card.capabilities.length > 0 && (
           <div className="flex gap-1.5 flex-wrap">
             {card.capabilities.map((tag) => (
@@ -226,23 +224,24 @@ function CapabilityItem({
           </div>
         )}
 
+        {/* Stats */}
         {(purchases > 0 || feedbackTotal > 0) && (
-          <div className="flex items-center gap-2 text-[11px] mt-1">
+          <div className="flex items-center gap-2 text-[11px]">
             {purchases > 0 && (
-              <span className="flex items-center gap-1 py-0.5 px-2 rounded-full bg-[#f0f0ee] text-text-2">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+              <span title={`${purchases} purchases`} className="flex items-center gap-1 py-0.5 px-1.5 rounded-md bg-[#f0f0ee] border border-border text-text-2">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
                 {purchases}
               </span>
             )}
             {feedbackPositive > 0 && (
-              <span className="flex items-center gap-1 py-0.5 px-2 rounded-full bg-[#e8f5e9] text-[#4caf50]">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M2 20h2c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1H2v11zm19.83-7.12c.11-.25.17-.52.17-.8V11c0-1.1-.9-2-2-2h-5.5l.92-4.65c.05-.22.02-.46-.08-.66L14.17 2 7.59 8.59C7.22 8.95 7 9.45 7 10v8c0 1.1.9 2 2 2h9c.78 0 1.47-.46 1.79-1.11l2.04-4.63z"/></svg>
+              <span title={`${feedbackPositive} positive reviews`} className="flex items-center gap-1 py-0.5 px-1.5 rounded-md bg-[#e8f5e9] text-[#4caf50]">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M2 20h2c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1H2v11zm19.83-7.12c.11-.25.17-.52.17-.8V11c0-1.1-.9-2-2-2h-5.5l.92-4.65c.05-.22.02-.46-.08-.66L14.17 2 7.59 8.59C7.22 8.95 7 9.45 7 10v8c0 1.1.9 2 2 2h9c.78 0 1.47-.46 1.79-1.11l2.04-4.63z"/></svg>
                 {feedbackPositive}
               </span>
             )}
             {feedbackNegative > 0 && (
-              <span className="flex items-center gap-1 py-0.5 px-2 rounded-full bg-[#fce4ec] text-[#ef5350]">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M22 4h-2c-.55 0-1 .45-1 1v9c0 .55.45 1 1 1h2V4zM2.17 11.12c-.11.25-.17.52-.17.8V13c0 1.1.9 2 2 2h5.5l-.92 4.65c-.05.22-.02.46.08.66L9.83 22l6.58-6.59c.36-.36.59-.86.59-1.41V6c0-1.1-.9-2-2-2H6c-.78 0-1.47.46-1.79 1.11l-2.04 4.63z"/></svg>
+              <span title={`${feedbackNegative} negative reviews`} className="flex items-center gap-1 py-0.5 px-1.5 rounded-md bg-[#fce4ec] text-[#ef5350]">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M22 4h-2c-.55 0-1 .45-1 1v9c0 .55.45 1 1 1h2V4zM2.17 11.12c-.11.25-.17.52-.17.8V13c0 1.1.9 2 2 2h5.5l-.92 4.65c-.05.22-.02.46.08.66L9.83 22l6.58-6.59c.36-.36.59-.86.59-1.41V6c0-1.1-.9-2-2-2H6c-.78 0-1.47.46-1.79 1.11l-2.04 4.63z"/></svg>
                 {feedbackNegative}
               </span>
             )}
@@ -251,7 +250,7 @@ function CapabilityItem({
 
         {/* Purchase section */}
         {hasPurchaseAction && !isOwn && (
-          <div className="mt-3">
+          <div className="mt-1 pt-3 border-t border-border">
             {result ? (
               <div>
                 <div className="p-3 bg-surface rounded-lg border border-border text-xs text-text leading-relaxed whitespace-pre-wrap">
@@ -263,13 +262,13 @@ function CapabilityItem({
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={() => rate(true)}
-                      className="py-1 px-3 rounded-lg border border-border bg-surface text-xs text-text-2 cursor-pointer hover:border-green hover:text-green transition-colors"
+                      className="py-1.5 px-3.5 rounded-lg border border-border bg-surface text-xs text-text-2 cursor-pointer hover:border-[#4caf50] hover:text-[#4caf50] hover:bg-[#e8f5e9] transition-colors"
                     >
                       👍 Good
                     </button>
                     <button
                       onClick={() => rate(false)}
-                      className="py-1 px-3 rounded-lg border border-border bg-surface text-xs text-text-2 cursor-pointer hover:border-error hover:text-error transition-colors"
+                      className="py-1.5 px-3.5 rounded-lg border border-border bg-surface text-xs text-text-2 cursor-pointer hover:border-[#ef5350] hover:text-[#ef5350] hover:bg-[#fce4ec] transition-colors"
                     >
                       👎 Bad
                     </button>
@@ -283,7 +282,7 @@ function CapabilityItem({
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Describe what you need..."
-                    className="w-full py-2 px-3 rounded-lg border border-border bg-surface text-text text-xs outline-none resize-y min-h-[60px] font-[inherit] mb-2 transition-colors focus:border-accent"
+                    className="w-full py-2.5 px-3 rounded-lg border border-border bg-surface text-text text-xs outline-none resize-y min-h-[70px] font-[inherit] mb-2.5 transition-colors focus:border-accent"
                   />
                 )}
                 <div className="flex items-center gap-2">
@@ -291,7 +290,7 @@ function CapabilityItem({
                     <button
                       onClick={handleBuy}
                       disabled={buying || !relaysConnected || ((!!publicKey || isFree) && !isStatic && !input.trim()) || ((!!publicKey || isFree) && pingStatus !== "online")}
-                      className="py-1.5 px-4 rounded-lg bg-accent text-white text-xs font-semibold border-none cursor-pointer hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="py-2 px-5 rounded-lg bg-accent text-white text-sm font-semibold border-none cursor-pointer hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {buttonLabel()}
                     </button>
