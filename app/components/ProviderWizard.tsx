@@ -797,11 +797,16 @@ function ProductCard({
           Delivery
         </label>
         <textarea
-          className="w-full py-3 px-3.5 rounded-[10px] border border-border bg-surface text-text text-sm outline-none resize-y min-h-[50px] font-[inherit] focus:border-accent"
+          className={`w-full py-3 px-3.5 rounded-[10px] border bg-surface text-text text-sm outline-none resize-y min-h-[50px] font-[inherit] focus:border-accent ${new TextEncoder().encode(product.result).length > 1024 ? "border-red-500" : "border-border"}`}
           placeholder="Content delivered to the buyer after payment"
           value={product.result}
           onChange={(e) => onUpdate(index, { result: e.target.value })}
         />
+        {new TextEncoder().encode(product.result).length > 1024 && (
+          <p className="text-red-500 text-xs mt-1">
+            Text is too large. Consider saving it somewhere and providing a link instead.
+          </p>
+        )}
       </div>
 
       <div>
