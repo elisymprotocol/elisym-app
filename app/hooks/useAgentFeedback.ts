@@ -127,11 +127,7 @@ export function useAgentFeedback(agentPubkeys: string[]) {
           };
         }
 
-        // Only count as purchase if the job was actually completed
         const isCompleted = completedJobIds.has(req.id);
-        if (isCompleted) {
-          map[providerPubkey].purchases++;
-        }
 
         if (capability) {
           jobMeta.set(req.id, { provider: providerPubkey, capability });

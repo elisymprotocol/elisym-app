@@ -83,7 +83,9 @@ function toDisplayData(agent: Agent, feedbackMap?: FeedbackMap): AgentDisplayDat
     feedbackPositive: fb?.positive ?? 0,
     feedbackNegative: fb?.negative ?? 0,
     feedbackTotal: fb?.total ?? 0,
-    purchases: fb?.purchases ?? 0,
+    purchases: fb?.byCapability
+      ? Object.values(fb.byCapability).reduce((sum, s) => sum + s.purchases, 0)
+      : 0,
     byCapability: fb?.byCapability ?? {},
   };
 }
