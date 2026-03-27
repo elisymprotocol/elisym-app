@@ -439,7 +439,7 @@ export function ProviderWizard() {
   return (
     <div
       className="fixed inset-0 bg-black/25 z-[500] flex items-center justify-center backdrop-blur-sm"
-      onClick={(e) => {
+      onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
           dispatch({ type: "CLOSE_WIZARD" });
         }
