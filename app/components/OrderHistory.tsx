@@ -141,14 +141,14 @@ export function OrderHistory() {
     });
   }, [orders]);
 
-  const rateOrder = useCallback(async (jobEventId: string, providerPubkey: string, positive: boolean) => {
+  const rateOrder = useCallback(async (jobEventId: string, providerPubkey: string, positive: boolean, capability: string) => {
     setRatedJobs((prev) => new Set(prev).add(jobEventId));
     try {
       const identity =
         idCtx?.identity ??
         ElisymIdentity.fromLocalStorage("elisym:identity") ??
         ElisymIdentity.generate();
-      await client.marketplace.submitFeedback(identity, jobEventId, providerPubkey, positive);
+      await client.marketplace.submitFeedback(identity, jobEventId, providerPubkey, positive, capability);
       await cacheSet(`rated:${jobEventId}`, true);
       track("rate-result", { rating: positive ? "good" : "bad" });
     } catch {
@@ -287,13 +287,13 @@ export function OrderHistory() {
                     ) : order.providerPubkey ? (
                       <div className="flex gap-2 mt-2">
                         <button
-                          onClick={() => rateOrder(order.jobEventId, order.providerPubkey!, true)}
+                          onClick={() => rateOrder(order.jobEventId, order.providerPubkey!, true, order.capability)}
                           className="py-1 px-3 rounded-lg border border-border bg-surface text-xs text-text-2 cursor-pointer hover:border-green hover:text-green transition-colors"
                         >
                           👍 Good
                         </button>
                         <button
-                          onClick={() => rateOrder(order.jobEventId, order.providerPubkey!, false)}
+                          onClick={() => rateOrder(order.jobEventId, order.providerPubkey!, false, order.capability)}
                           className="py-1 px-3 rounded-lg border border-border bg-surface text-xs text-text-2 cursor-pointer hover:border-error hover:text-error transition-colors"
                         >
                           👎 Bad

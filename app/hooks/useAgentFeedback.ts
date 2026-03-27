@@ -164,17 +164,20 @@ export function useAgentFeedback(agentPubkeys: string[]) {
         }
         map[providerPubkey].total++;
 
-        // Per-capability feedback
+        // Per-capability feedback: prefer direct #t tag, fall back to jobMeta lookup
+        const directCapability = ev.tags.find(
+          (t) => t[0] === "t" && t[1] !== "elisym",
+        )?.[1];
         const jobId = ev.tags.find((t) => t[0] === "e")?.[1];
-        const meta = jobId ? jobMeta.get(jobId) : undefined;
-        if (meta) {
+        const capability = directCapability ?? (jobId ? jobMeta.get(jobId)?.capability : undefined);
+        if (capability) {
           const capStats = map[providerPubkey].byCapability;
-          if (!capStats[meta.capability]) {
-            capStats[meta.capability] = {
+          if (!capStats[capability]) {
+            capStats[capability] = {
               positive: 0, negative: 0, total: 0, purchases: 0,
             };
           }
-          const cap = capStats[meta.capability]!;
+          const cap = capStats[capability]!;
           if (isPositive) {
             cap.positive++;
           } else {

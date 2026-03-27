@@ -113,12 +113,12 @@ export function useBuyCapability({
 
               // Build and send transaction
               const tx = PaymentService.buildPaymentTransaction(
-                publicKey,
+                publicKey!,
                 paymentRequest,
               );
               const { blockhash } = await connection.getLatestBlockhash();
               tx.recentBlockhash = blockhash;
-              tx.feePayer = publicKey;
+              tx.feePayer = publicKey!;
 
               toast.loading("Approve the transaction in your wallet...", { id: toastId });
 
@@ -205,7 +205,7 @@ export function useBuyCapability({
         idCtx?.identity ??
         ElisymIdentity.fromLocalStorage("elisym:identity") ??
         ElisymIdentity.generate();
-      await client.marketplace.submitFeedback(identity, jobId, agentPubkey, positive);
+      await client.marketplace.submitFeedback(identity, jobId, agentPubkey, positive, toDTag(card.name));
       await cacheSet(`rated:${jobId}`, true);
       track("rate-result", { rating: positive ? "good" : "bad" });
     } catch {

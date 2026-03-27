@@ -35,7 +35,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <ConnectionProvider endpoint={endpoint}>
         <WalletProvider wallets={wallets} autoConnect>
           <WalletModalProvider>
-            <ElisymProvider config={{ network: "devnet" }}>
+            <ElisymProvider config={{}}>
               <IdentityProvider>
                 <Heartbeat>
                   <UIProvider>
