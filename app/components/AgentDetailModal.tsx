@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useBodyScrollLock } from "~/hooks/useBodyScrollLock";
 import { formatSol, truncateKey, toDTag } from "@elisym/sdk";
 import { track } from "~/lib/analytics";
 import type { CapabilityCard } from "@elisym/sdk";
@@ -24,6 +25,7 @@ const STATUS_DOT: Record<PingStatus, string> = {
 };
 
 export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
+  useBodyScrollLock(true);
   const idCtx = useOptionalIdentity();
   const isOwn = idCtx?.publicKey === agent.pubkey;
   const pingedStatus = usePingAgent(isOwn ? "" : agent.pubkey);

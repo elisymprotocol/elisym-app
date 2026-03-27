@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useBodyScrollLock } from "~/hooks/useBodyScrollLock";
 import { useLocation } from "react-router";
 import { track } from "~/lib/analytics";
 
@@ -8,6 +9,7 @@ export function TermsModal() {
   const location = useLocation();
   const [visible, setVisible] = useState(false);
   const [checked, setChecked] = useState(false);
+  useBodyScrollLock(visible);
 
   useEffect(() => {
     if (localStorage.getItem(TERMS_ACCEPTED_KEY) !== "1") {

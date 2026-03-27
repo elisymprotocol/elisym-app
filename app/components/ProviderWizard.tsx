@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState, useEffect } from "react";
+import { useBodyScrollLock } from "~/hooks/useBodyScrollLock";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useElisymClient } from "~/hooks/useElisymClient";
@@ -46,6 +47,7 @@ const CATEGORIES = ["UI/UX", "Summary", "Tools", "Code", "Data"];
 
 export function ProviderWizard() {
   const [state, dispatch] = useUI();
+  useBodyScrollLock(state.wizardOpen);
   const { client } = useElisymClient();
   const queryClient = useQueryClient();
   const { publicKey } = useWallet();
