@@ -59,6 +59,8 @@ export function useBuyCapability({
     setError(null);
     setResult(null);
 
+    const toastId = toast.loading("Submitting job...");
+
     try {
       const identity =
         idCtx?.identity ??
@@ -86,7 +88,7 @@ export function useBuyCapability({
         createdAt: Date.now(),
       });
 
-      toast.info("Job submitted, waiting for provider...");
+      toast.loading("Waiting for provider...", { id: toastId });
 
       // 3. Subscribe to updates
       const cleanup = client.marketplace.subscribeToJobUpdates(
@@ -118,7 +120,7 @@ export function useBuyCapability({
               tx.recentBlockhash = blockhash;
               tx.feePayer = publicKey;
 
-              toast.info("Approve the transaction in your wallet...");
+              toast.loading("Approve the transaction in your wallet...", { id: toastId });
 
               const signature = await sendTransaction(tx, connection);
               await connection.confirmTransaction(signature, "confirmed");
@@ -137,13 +139,13 @@ export function useBuyCapability({
                 txHash: signature,
               });
 
-              toast.success("Payment sent, waiting for result...");
+              toast.loading("Payment sent, waiting for result...", { id: toastId });
             } catch (err) {
               const msg = err instanceof Error ? err.message : "Payment failed";
               setError(msg);
               updateJob(jobEventId, { status: "error" });
               setBuying(false);
-              toast.error(msg);
+              toast.error(msg, { id: toastId });
             }
           },
 
@@ -159,14 +161,14 @@ export function useBuyCapability({
             });
 
             setBuying(false);
-            toast.success("Result received!");
+            toast.success("Result received!", { id: toastId });
           },
 
           onError: (errMsg) => {
             setError(errMsg);
             updateJob(jobEventId, { status: "error" });
             setBuying(false);
-            toast.error(errMsg);
+            toast.error(errMsg, { id: toastId });
           },
         },
         120_000,
@@ -178,7 +180,7 @@ export function useBuyCapability({
       const msg = err instanceof Error ? err.message : "Failed to submit job";
       setError(msg);
       setBuying(false);
-      toast.error(msg);
+      toast.error(msg, { id: toastId });
     }
   }, [
     buying,
