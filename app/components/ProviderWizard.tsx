@@ -3,11 +3,11 @@ import { useBodyScrollLock } from "~/hooks/useBodyScrollLock";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useElisymClient } from "~/hooks/useElisymClient";
-import { ElisymIdentity, toDTag, type CapabilityCard } from "@elisym/sdk";
+import { toDTag, type CapabilityCard } from "@elisym/sdk";
 import { toast } from "sonner";
 import { track } from "~/lib/analytics";
 import { useUI } from "~/contexts/UIContext";
-import { useOptionalIdentity } from "~/hooks/useIdentity";
+import { useIdentity } from "~/hooks/useIdentity";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
 import { uploadToNostrBuild } from "~/lib/uploadImage";
 import { cacheGet, cacheSet, cacheDel } from "~/lib/localCache";
@@ -51,8 +51,8 @@ export function ProviderWizard() {
   const { client } = useElisymClient();
   const queryClient = useQueryClient();
   const { publicKey } = useWallet();
-  const idCtx = useOptionalIdentity();
-  const nostrPubkey = idCtx?.publicKey ?? "";
+  const idCtx = useIdentity();
+  const nostrPubkey = idCtx.publicKey;
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [publishing, setPublishing] = useState(false);
   const [successType, setSuccessType] = useState<"profile" | "capabilities" | null>(null);
@@ -202,9 +202,7 @@ export function ProviderWizard() {
 
   function getIdentity() {
     return (
-      idCtx?.identity ??
-      ElisymIdentity.fromLocalStorage("elisym:identity") ??
-      ElisymIdentity.generate()
+      idCtx.identity
     );
   }
 

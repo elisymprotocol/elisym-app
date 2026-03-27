@@ -1,5 +1,5 @@
 import { useUI } from "~/contexts/UIContext";
-import { useOptionalIdentity } from "~/hooks/useIdentity";
+import { useIdentity } from "~/hooks/useIdentity";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,8 +11,8 @@ export function HeroSection() {
   const [, dispatch] = useUI();
   const { publicKey } = useWallet();
   const { setVisible } = useWalletModal();
-  const idCtx = useOptionalIdentity();
-  const pubkey = idCtx?.publicKey ?? "";
+  const idCtx = useIdentity();
+  const pubkey = idCtx.publicKey;
   const queryClient = useQueryClient();
   const capabilities = queryClient.getQueryData<{ card: CapabilityCard; dTag: string }[]>(["nostr-capabilities", pubkey]);
   const activeCards = capabilities?.filter((c) => c.card.name) ?? [];

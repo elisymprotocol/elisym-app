@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import Decimal from "decimal.js-light";
-import { truncateKey, timeAgo, ElisymIdentity } from "@elisym/sdk";
+import { truncateKey, timeAgo } from "@elisym/sdk";
 import * as nip44 from "nostr-tools/nip44";
 import { useElisymClient } from "~/hooks/useElisymClient";
-import { useOptionalIdentity } from "~/hooks/useIdentity";
+import { useIdentity } from "~/hooks/useIdentity";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
 import { cacheGet, cacheSet } from "~/lib/localCache";
 import { track } from "~/lib/analytics";
@@ -22,8 +22,8 @@ interface Order {
 
 export function OrderHistory() {
   const { client } = useElisymClient();
-  const idCtx = useOptionalIdentity();
-  const pubkey = idCtx?.publicKey ?? "";
+  const idCtx = useIdentity();
+  const pubkey = idCtx.publicKey;
   const [syncing, setSyncing] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [ratedJobs, setRatedJobs] = useState<Set<string>>(new Set());
@@ -79,7 +79,7 @@ export function OrderHistory() {
       if (completedRequests.length === 0) return [];
 
       // Index results by request ID, decrypting NIP-44 if needed
-      const sk = idCtx?.identity?.secretKey;
+      const sk = idCtx.identity?.secretKey;
       const resultByRequest = new Map<string, { content: string; amount?: number }>();
       for (const r of results) {
         const eTag = r.tags.find((t) => t[0] === "e");
@@ -144,17 +144,14 @@ export function OrderHistory() {
   const rateOrder = useCallback(async (jobEventId: string, providerPubkey: string, positive: boolean, capability: string) => {
     setRatedJobs((prev) => new Set(prev).add(jobEventId));
     try {
-      const identity =
-        idCtx?.identity ??
-        ElisymIdentity.fromLocalStorage("elisym:identity") ??
-        ElisymIdentity.generate();
+      const identity = idCtx.identity;
       await client.marketplace.submitFeedback(identity, jobEventId, providerPubkey, positive, capability);
       await cacheSet(`rated:${jobEventId}`, true);
       track("rate-result", { rating: positive ? "good" : "bad" });
     } catch {
       // silent fail
     }
-  }, [client, idCtx?.identity]);
+  }, [client, idCtx.identity]);
 
   async function handleResync() {
     setSyncing(true);

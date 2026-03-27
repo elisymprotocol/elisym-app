@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Decimal from "decimal.js-light";
 import { useQueryClient } from "@tanstack/react-query";
-import { useOptionalIdentity } from "~/hooks/useIdentity";
+import { useIdentity } from "~/hooks/useIdentity";
 import { useElisymClient } from "~/hooks/useElisymClient";
 import { useLocalQuery } from "~/hooks/useLocalQuery";
 import { useUI } from "~/contexts/UIContext";
@@ -11,8 +11,8 @@ import type { Filter } from "nostr-tools";
 
 export function ProfileStats() {
   const { client } = useElisymClient();
-  const idCtx = useOptionalIdentity();
-  const pubkey = idCtx?.publicKey ?? "";
+  const idCtx = useIdentity();
+  const pubkey = idCtx.publicKey;
   const [, dispatch] = useUI();
   const [syncing, setSyncing] = useState(false);
 

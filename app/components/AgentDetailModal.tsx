@@ -8,7 +8,7 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { nip19 } from "nostr-tools";
 import { MarbleAvatar } from "./MarbleAvatar";
 import { useBuyCapability } from "~/hooks/useBuyCapability";
-import { useOptionalIdentity } from "~/hooks/useIdentity";
+import { useIdentity } from "~/hooks/useIdentity";
 import { usePingAgent, type PingStatus } from "~/hooks/usePingAgent";
 import { useElisymClient } from "~/hooks/useElisymClient";
 import type { AgentDisplayData } from "~/hooks/useAgentDisplay";
@@ -26,8 +26,8 @@ const STATUS_DOT: Record<PingStatus, string> = {
 
 export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
   useBodyScrollLock(true);
-  const idCtx = useOptionalIdentity();
-  const isOwn = idCtx?.publicKey === agent.pubkey;
+  const idCtx = useIdentity();
+  const isOwn = idCtx.publicKey === agent.pubkey;
   const pingedStatus = usePingAgent(isOwn ? "" : agent.pubkey);
   const pingStatus: PingStatus = isOwn ? "online" : pingedStatus;
 
@@ -151,8 +151,8 @@ function CapabilityItem({
   const { publicKey } = useWallet();
   const { setVisible } = useWalletModal();
   const { relaysConnected } = useElisymClient();
-  const idCtx = useOptionalIdentity();
-  const isOwn = idCtx?.publicKey === agentPubkey;
+  const idCtx = useIdentity();
+  const isOwn = idCtx.publicKey === agentPubkey;
   const { buy, buying, result, error, rate, rated } = useBuyCapability({
     agentPubkey,
     agentName,

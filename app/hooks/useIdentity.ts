@@ -9,9 +9,11 @@ import {
 import { ElisymIdentity } from "@elisym/sdk";
 import { nip19 } from "nostr-tools";
 import { createElement } from "react";
+import {
+  loadIdentities,
+  saveIdentities,
+} from "~/lib/keyVault";
 
-const COMPAT_KEY = "elisym:identity";
-const IDENTITIES_KEY = "elisym:identities";
 const ACTIVE_KEY = "elisym:active-identity";
 
 export interface StoredIdentity {
@@ -27,18 +29,6 @@ function toHex(sk: Uint8Array): string {
     .join("");
 }
 
-function readIdentities(): StoredIdentity[] {
-  try {
-    const raw = localStorage.getItem(IDENTITIES_KEY);
-    if (raw) return JSON.parse(raw) as StoredIdentity[];
-  } catch {}
-  return [];
-}
-
-function writeIdentities(list: StoredIdentity[]) {
-  localStorage.setItem(IDENTITIES_KEY, JSON.stringify(list));
-}
-
 function readActiveId(): string | null {
   return localStorage.getItem(ACTIVE_KEY);
 }
@@ -47,73 +37,14 @@ function writeActiveId(id: string) {
   localStorage.setItem(ACTIVE_KEY, id);
 }
 
-function writeCompat(hex: string) {
-  localStorage.setItem(COMPAT_KEY, hex);
-}
-
-function migrate(): { list: StoredIdentity[]; activeId: string } {
-  let list = readIdentities();
-  let activeId = readActiveId();
-
-  if (list.length === 0) {
-    const legacyHex = localStorage.getItem(COMPAT_KEY);
-    if (legacyHex) {
-      const entry: StoredIdentity = {
-        id: crypto.randomUUID(),
-        hex: legacyHex,
-        name: "Key 1",
-        createdAt: Date.now(),
-      };
-      list = [entry];
-      activeId = entry.id;
-      writeIdentities(list);
-      writeActiveId(activeId);
-    } else {
-      const fresh = ElisymIdentity.generate();
-      const hex = toHex(fresh.secretKey);
-      const entry: StoredIdentity = {
-        id: crypto.randomUUID(),
-        hex,
-        name: "Key 1",
-        createdAt: Date.now(),
-      };
-      list = [entry];
-      activeId = entry.id;
-      writeIdentities(list);
-      writeActiveId(activeId);
-      writeCompat(hex);
-    }
-  }
-
-  if (!activeId || !list.find((e) => e.id === activeId)) {
-    activeId = list[0]!.id;
-    writeActiveId(activeId);
-  }
-
-  const active = list.find((e) => e.id === activeId)!;
-  writeCompat(active.hex);
-
-  return { list, activeId };
-}
-
 interface IdentityState {
   allIdentities: StoredIdentity[];
   activeId: string;
   identity: ElisymIdentity;
 }
 
-function init(): IdentityState | null {
-  if (typeof window === "undefined") return null;
-  const { list, activeId } = migrate();
-  const active = list.find((e) => e.id === activeId)!;
-  return {
-    allIdentities: list,
-    activeId,
-    identity: ElisymIdentity.fromHex(active.hex),
-  };
-}
-
 interface IdentityContextValue {
+  loading: boolean;
   identity: ElisymIdentity;
   npub: string;
   publicKey: string;
@@ -129,22 +60,51 @@ interface IdentityContextValue {
 const IdentityContext = createContext<IdentityContextValue | null>(null);
 
 export function IdentityProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<IdentityState | null>(init);
+  const [state, setState] = useState<IdentityState | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Hydrate on client if SSR returned null
+  // Async init: load encrypted identities
   useEffect(() => {
-    if (!state) setState(init());
+    if (typeof window === "undefined") return;
+
+    (async () => {
+      let list = await loadIdentities();
+      let activeId = readActiveId();
+
+      if (list.length === 0) {
+        const fresh = ElisymIdentity.generate();
+        const hex = toHex(fresh.secretKey);
+        const entry: StoredIdentity = {
+          id: crypto.randomUUID(),
+          hex,
+          name: "Key 1",
+          createdAt: Date.now(),
+        };
+        list = [entry];
+        activeId = entry.id;
+        await saveIdentities(list);
+        writeActiveId(activeId);
+      }
+
+      if (!activeId || !list.find((e) => e.id === activeId)) {
+        activeId = list[0]!.id;
+        writeActiveId(activeId);
+      }
+
+      const active = list.find((e) => e.id === activeId)!;
+      setState({
+        allIdentities: list,
+        activeId,
+        identity: ElisymIdentity.fromHex(active.hex),
+      });
+      setLoading(false);
+    })();
   }, []);
 
-  if (!state) {
-    return createElement(IdentityContext.Provider, { value: null }, children);
-  }
-
-  const { identity, allIdentities, activeId } = state;
-
+  // All hooks must be called unconditionally (React rules of hooks)
   const nsecEncode = useCallback(
-    () => nip19.nsecEncode(identity.secretKey),
-    [identity],
+    () => state ? nip19.nsecEncode(state.identity.secretKey) : "",
+    [state],
   );
 
   const addIdentity = useCallback(() => {
@@ -159,9 +119,8 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
         createdAt: Date.now(),
       };
       const newList = [...prev.allIdentities, entry];
-      writeIdentities(newList);
       writeActiveId(entry.id);
-      writeCompat(hex);
+      void saveIdentities(newList);
       return { allIdentities: newList, activeId: entry.id, identity: fresh };
     });
   }, []);
@@ -172,7 +131,6 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
       const entry = prev.allIdentities.find((e) => e.id === id);
       if (!entry) return prev;
       writeActiveId(id);
-      writeCompat(entry.hex);
       return {
         allIdentities: prev.allIdentities,
         activeId: id,
@@ -186,13 +144,12 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
       if (!prev) return prev;
       if (prev.allIdentities.length <= 1) return prev;
       const newList = prev.allIdentities.filter((e) => e.id !== id);
-      writeIdentities(newList);
+      void saveIdentities(newList);
 
       let newActiveId = prev.activeId;
       if (prev.activeId === id) {
         newActiveId = newList[0]!.id;
         writeActiveId(newActiveId);
-        writeCompat(newList[0]!.hex);
       }
 
       return {
@@ -211,12 +168,19 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
       const newList = prev.allIdentities.map((e) =>
         e.id === id ? { ...e, name } : e,
       );
-      writeIdentities(newList);
+      void saveIdentities(newList);
       return { ...prev, allIdentities: newList };
     });
   }, []);
 
+  if (loading || !state) {
+    return null;
+  }
+
+  const { identity, allIdentities, activeId } = state;
+
   const value: IdentityContextValue = {
+    loading: false,
     identity,
     npub: identity.npub,
     publicKey: identity.publicKey,
@@ -238,9 +202,4 @@ export function useIdentity(): IdentityContextValue {
     throw new Error("useIdentity must be used within <IdentityProvider>");
   }
   return ctx;
-}
-
-/** Returns null during SSR / before IdentityProvider hydrates. */
-export function useOptionalIdentity(): IdentityContextValue | null {
-  return useContext(IdentityContext);
 }

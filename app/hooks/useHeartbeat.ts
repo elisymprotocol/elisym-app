@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useOptionalIdentity } from "./useIdentity";
+import { useIdentity } from "./useIdentity";
 import { useElisymClient } from "./useElisymClient";
 import { useLocalQuery } from "./useLocalQuery";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -50,9 +50,9 @@ export function removeDeletedDTags(dTags: Iterable<string>): void {
  */
 export function useHeartbeat() {
   const { client } = useElisymClient();
-  const idCtx = useOptionalIdentity();
-  const identity = idCtx?.identity ?? null;
-  const pubkey = idCtx?.publicKey ?? "";
+  const idCtx = useIdentity();
+  const identity = idCtx.identity;
+  const pubkey = idCtx.publicKey;
   const { publicKey } = useWallet();
   const walletAddress = publicKey?.toBase58() ?? "";
   const queryClient = useQueryClient();

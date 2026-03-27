@@ -1,13 +1,13 @@
 import { useElisymClient } from "./useElisymClient";
 import { useLocalQuery } from "./useLocalQuery";
-import { useOptionalIdentity } from "./useIdentity";
+import { useIdentity } from "./useIdentity";
 import { getDeletedDTags } from "./useHeartbeat";
 import { toDTag, type Agent } from "@elisym/sdk";
 
 export function useAgents() {
   const { client } = useElisymClient();
-  const idCtx = useOptionalIdentity();
-  const myPubkey = idCtx?.publicKey ?? "";
+  const idCtx = useIdentity();
+  const myPubkey = idCtx.publicKey;
 
   return useLocalQuery<Agent[]>({
     queryKey: ["agents"],

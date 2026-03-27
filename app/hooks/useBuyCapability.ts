@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import {
-  ElisymIdentity,
   PaymentService,
   toDTag,
   type CapabilityCard,
@@ -9,7 +8,7 @@ import {
 } from "@elisym/sdk";
 import { toast } from "sonner";
 import { useElisymClient } from "./useElisymClient";
-import { useOptionalIdentity } from "./useIdentity";
+import { useIdentity } from "./useIdentity";
 import { useJobHistory } from "./useJobHistory";
 import { cacheSet } from "~/lib/localCache";
 import { track } from "~/lib/analytics";
@@ -28,7 +27,7 @@ export function useBuyCapability({
   card,
 }: BuyCapabilityOptions) {
   const { client } = useElisymClient();
-  const idCtx = useOptionalIdentity();
+  const idCtx = useIdentity();
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const wallet = publicKey?.toBase58() ?? "";
@@ -62,10 +61,7 @@ export function useBuyCapability({
     const toastId = toast.loading("Submitting job...");
 
     try {
-      const identity =
-        idCtx?.identity ??
-        ElisymIdentity.fromLocalStorage("elisym:identity") ??
-        ElisymIdentity.generate();
+      const identity = idCtx.identity;
 
       const capability = toDTag(card.name);
 
@@ -186,7 +182,7 @@ export function useBuyCapability({
     buying,
     publicKey,
     client,
-    idCtx?.identity,
+    idCtx.identity,
     agentPubkey,
     agentName,
     agentPicture,
@@ -201,17 +197,14 @@ export function useBuyCapability({
     if (!jobId || rated) return;
     setRated(true);
     try {
-      const identity =
-        idCtx?.identity ??
-        ElisymIdentity.fromLocalStorage("elisym:identity") ??
-        ElisymIdentity.generate();
+      const identity = idCtx.identity;
       await client.marketplace.submitFeedback(identity, jobId, agentPubkey, positive, toDTag(card.name));
       await cacheSet(`rated:${jobId}`, true);
       track("rate-result", { rating: positive ? "good" : "bad" });
     } catch {
       // silent fail
     }
-  }, [jobId, rated, client, idCtx?.identity, agentPubkey]);
+  }, [jobId, rated, client, idCtx.identity, agentPubkey]);
 
   return { buy, buying, result, error, jobId, rate, rated };
 }
