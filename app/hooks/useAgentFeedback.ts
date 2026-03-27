@@ -74,7 +74,7 @@ export function useAgentFeedback(agentPubkeys: string[]) {
   const pubkeysKey = agentPubkeys.slice().sort().join(",");
 
   return useLocalQuery<FeedbackMap>({
-    queryKey: ["agent-feedback", pubkeysKey],
+    queryKey: ["agent-feedback-v2", pubkeysKey],
     queryFn: async () => {
       if (agentPubkeys.length === 0) return {};
 
@@ -182,6 +182,12 @@ export function useAgentFeedback(agentPubkeys: string[]) {
           }
           cap.total++;
         }
+      }
+
+      // Derive agent-level purchases from per-capability totals (single source of truth)
+      for (const entry of Object.values(map)) {
+        entry.purchases = Object.values(entry.byCapability)
+          .reduce((sum, s) => sum + s.purchases, 0);
       }
 
       // Never decrease — merge with high water mark
