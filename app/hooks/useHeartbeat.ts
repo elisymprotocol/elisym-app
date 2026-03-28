@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useIdentity } from "./useIdentity";
 import { useElisymClient } from "./useElisymClient";
 import { useLocalQuery } from "./useLocalQuery";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatSol, type CapabilityCard } from "@elisym/sdk";
 import { toast } from "sonner";
@@ -54,6 +54,7 @@ export function useHeartbeat() {
   const identity = idCtx.identity;
   const pubkey = idCtx.publicKey;
   const { publicKey } = useWallet();
+  const { connection } = useConnection();
   const walletAddress = publicKey?.toBase58() ?? "";
   const queryClient = useQueryClient();
 
@@ -183,6 +184,7 @@ export function useHeartbeat() {
       type: "start",
       secretKeyHex,
       capabilities,
+      rpcUrl: connection.rpcEndpoint,
     });
 
     workerRef.current = worker;
@@ -206,5 +208,5 @@ export function useHeartbeat() {
         workerRef.current = null;
       }
     };
-  }, [identity, capabilities, walletAddress, capsTrigger]);
+  }, [identity, capabilities, walletAddress, capsTrigger, connection.rpcEndpoint]);
 }
