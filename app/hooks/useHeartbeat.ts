@@ -59,7 +59,7 @@ export function useHeartbeat() {
   const queryClient = useQueryClient();
 
   // Fetch capabilities for current identity
-  const { data: capabilities } = useLocalQuery<{ card: CapabilityCard; dTag: string }[]>({
+  const { data: capabilities, isFetchedAfterMount } = useLocalQuery<{ card: CapabilityCard; dTag: string }[]>({
     queryKey: ["nostr-capabilities", pubkey],
     queryFn: async () => {
       const events = await client.pool.querySync({
@@ -119,7 +119,7 @@ export function useHeartbeat() {
       workerRef.current = null;
     }
 
-    if (!identity || !capabilities || capabilities.length === 0) return;
+    if (!identity || !capabilities || capabilities.length === 0 || !isFetchedAfterMount) return;
 
     // Republish capabilities if wallet address changed
     if (walletAddress) {
@@ -208,5 +208,5 @@ export function useHeartbeat() {
         workerRef.current = null;
       }
     };
-  }, [identity, capabilities, walletAddress, capsTrigger, connection.rpcEndpoint]);
+  }, [identity, capabilities, walletAddress, capsTrigger, connection.rpcEndpoint, isFetchedAfterMount]);
 }
