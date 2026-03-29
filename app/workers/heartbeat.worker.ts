@@ -5,6 +5,7 @@ import {
   PROTOCOL_TREASURY,
   KIND_JOB_REQUEST,
   KIND_JOB_RESULT,
+  KIND_PING,
   type CapabilityCard,
 } from "@elisym/sdk";
 import type { Filter, Event } from "nostr-tools";
@@ -426,50 +427,64 @@ async function handleJob(event: Event) {
   }
 }
 
-function setupSubscriptions() {
+async function setupSubscriptions() {
   if (!client || !identity) return;
 
-  // Ping/pong responder
-  dmSub = client.messaging.subscribeToPings(
-    identity,
-    (senderPubkey: string, nonce: string) => {
-      const now = Date.now();
-      const last = lastPings.get(senderPubkey) ?? 0;
-      if (now - last < PING_COOLDOWN_MS) {
-        log(`Ping from ${senderPubkey.slice(0, 8)} throttled (cooldown)`);
-        return;
-      }
-      lastPings.set(senderPubkey, now);
+  const pk = identity.publicKey;
 
-      log(`← Ping received from ${senderPubkey.slice(0, 8)} nonce=${nonce.slice(0, 8)}`);
-      client!.messaging
-        .sendPong(identity!, senderPubkey, nonce)
-        .then(() => log(`→ Pong sent to ${senderPubkey.slice(0, 8)} nonce=${nonce.slice(0, 8)}`))
-        .catch((err) => log(`✗ Pong failed to ${senderPubkey.slice(0, 8)}: ${err}`));
+  // Ping/pong responder — wait for relay EOSE before considering active
+  dmSub = await client.pool.subscribeAndWait(
+    { kinds: [KIND_PING], "#p": [pk] } as Filter,
+    (ev: Event) => {
+      try {
+        const msg = JSON.parse(ev.content);
+        if (msg.type !== "elisym_ping" || !msg.nonce) return;
+        const senderPubkey = ev.pubkey;
+        const nonce: string = msg.nonce;
+
+        const now = Date.now();
+        const last = lastPings.get(senderPubkey) ?? 0;
+        if (now - last < PING_COOLDOWN_MS) {
+          log(`Ping from ${senderPubkey.slice(0, 8)} throttled (cooldown)`);
+          return;
+        }
+        lastPings.set(senderPubkey, now);
+
+        log(`← Ping received from ${senderPubkey.slice(0, 8)} nonce=${nonce.slice(0, 8)}`);
+        client!.messaging
+          .sendPong(identity!, senderPubkey, nonce)
+          .then(() => log(`→ Pong sent to ${senderPubkey.slice(0, 8)} nonce=${nonce.slice(0, 8)}`))
+          .catch((err: unknown) => log(`✗ Pong failed to ${senderPubkey.slice(0, 8)}: ${err}`));
+      } catch {
+        /* ignore malformed */
+      }
     },
   );
-  log("Ping responder active");
+  log("Ping responder active (EOSE confirmed)");
 
-  // Job handler
-  jobSub = client.marketplace.subscribeToJobRequests(
-    identity,
-    [KIND_JOB_REQUEST],
-    (event) => void handleJob(event),
+  // Job handler — wait for relay EOSE before considering active
+  jobSub = await client.pool.subscribeAndWait(
+    {
+      kinds: [KIND_JOB_REQUEST],
+      "#p": [pk],
+      since: Math.floor(Date.now() / 1000),
+    } as Filter,
+    (event: Event) => void handleJob(event),
   );
-  log("Job handler active");
+  log("Job handler active (EOSE confirmed)");
 }
 
 // --------------- Reconnect ---------------
 
-function restartConnection() {
+async function restartConnectionAsync() {
   if (isReconnecting || !client) return;
   isReconnecting = true;
 
   closeSubs();
   client.pool.reset();
-  setupSubscriptions();
+  await setupSubscriptions();
   isReconnecting = false;
-  log("Reconnected (pool reset)");
+  log("Reconnected (pool reset, subs confirmed)");
 }
 
 // --------------- Cleanup ---------------
@@ -521,6 +536,14 @@ function start(msg: StartMessage) {
 
   const publishHeartbeat = async () => {
     try {
+      // Ensure subscriptions are alive before announcing ourselves as online.
+      // After OS suspend / Power Nap, WebSocket connections die but timers
+      // still fire — publishing a heartbeat without live subs makes us appear
+      // online while being unable to respond to pings or jobs.
+      if (!dmSub || !jobSub) {
+        log("Subs dead before heartbeat — reconnecting first");
+        await restartConnectionAsync();
+      }
       await client!.discovery.publishCapability(identity!, lastCap.card);
       consecutiveErrors = 0;
       // Run recovery once after first successful heartbeat (relays confirmed connected)
@@ -532,15 +555,19 @@ function start(msg: StartMessage) {
       consecutiveErrors++;
       post({ type: "log", level: "error", message: `Heartbeat error (${consecutiveErrors}): ${e}` });
       if (consecutiveErrors >= 1) {
-        restartConnection();
+        await restartConnectionAsync();
         consecutiveErrors = 0;
       }
     }
   };
 
-  void publishHeartbeat();
-  heartbeatInterval = setInterval(() => void publishHeartbeat(), HEARTBEAT_MS);
-  log("Heartbeat started");
+  // --- Subscriptions first, then heartbeat ---
+  // Ensure we can respond to pings/jobs before announcing ourselves as online.
+  setupSubscriptions().then(() => {
+    void publishHeartbeat();
+    heartbeatInterval = setInterval(() => void publishHeartbeat(), HEARTBEAT_MS);
+    log("Heartbeat started");
+  });
 
   // --- Suspend detection ---
   // Detect when the browser/OS suspended the worker (e.g. background tab,
@@ -553,13 +580,9 @@ function start(msg: StartMessage) {
     lastCheckTime = now;
     if (drift > SUSPEND_DRIFT_MS) {
       log(`Detected suspension (drift ${Math.round(drift / 1000)}s), reconnecting...`);
-      restartConnection();
-      void publishHeartbeat();
+      void restartConnectionAsync().then(() => publishHeartbeat());
     }
   }, SUSPEND_CHECK_MS);
-
-  // --- Subscriptions ---
-  setupSubscriptions();
 
   // Recovery runs automatically after first successful heartbeat
 }
@@ -727,7 +750,7 @@ self.onmessage = (e: MessageEvent<InMessage>) => {
           .then(() => log("Connection probe OK"))
           .catch(() => {
             log("Connection probe failed, reconnecting...");
-            restartConnection();
+            void restartConnectionAsync();
           });
       }
       break;
