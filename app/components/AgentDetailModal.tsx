@@ -68,9 +68,14 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
                 </span>
                 <span className={`size-2.5 rounded-full shrink-0 mt-2 ${STATUS_DOT[pingStatus]}`} />
               </h2>
-              <div className="font-mono text-xs text-text-2 mt-0.5">
+              <button
+                type="button"
+                className="font-mono text-xs text-text-2 mt-0.5 hover:text-text-1 cursor-pointer transition-colors"
+                onClick={() => navigator.clipboard.writeText(nip19.npubEncode(agent.pubkey))}
+                title="Copy full npub to clipboard"
+              >
                 {truncateKey(nip19.npubEncode(agent.pubkey))}
-              </div>
+              </button>
             </div>
           </div>
         </div>
